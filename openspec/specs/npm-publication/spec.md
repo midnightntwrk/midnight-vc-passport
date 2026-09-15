@@ -1,8 +1,6 @@
 ## Purpose
 
-Defines the npmjs release train for the digital-passport package: how versions are cut, what gates a publication must pass, how the registry receives tested artifacts with provenance evidence, and how dist-tags are kept safe. Adapted from the `midnight-verifiable-credentials` publication model to this single-package repository.
-
-Scopes the registry-facing requirements of the npmjs release train to the period when the npmjs-registry publication path is active: during the temporary GitHub-Release bridge window (see the `github-release-distribution` capability) those requirements are suspended, and they are restored to unconditional form by the bridge-exit change. The remaining `npm-publication` requirements — publication channels and branch gating, stateless release versioning, the pre-publication gate, and the publication runbook — remain in force unchanged during the bridge; the release-evidence requirement is scoped with the registry-facing set because its npm dist-tag state snapshot is produced by the suspended dist-tag snapshot step and cannot exist during the bridge window.
+Defines the npmjs release train for the digital-passport package: how versions are cut, what gates a publication must pass, how the registry receives tested artifacts with provenance evidence, and how dist-tags are kept safe — authenticated end-to-end by npm Trusted Publishing (GitHub Actions OIDC under the protected `npm-release` environment; no npm token exists). Adapted from the `midnight-verifiable-credentials` publication model to this single-package repository.
 
 ## Requirements
 

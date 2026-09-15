@@ -1,29 +1,22 @@
 name: Publish
 
 # The release train for the digital-passport family package
-# (npm-publication + github-release-distribution specs). Manually dispatched
-# only — no push, pull_request, or schedule trigger may ever start a
-# publication. The channel/branch gate runs first and fails the run before
-# any build step:
-#   - rc:       develop or main
-#   - release:  main only
-#   (snapshot fails closed during the bridge: run-number-stamped versions
-#   cannot be pre-tagged by an operator)
+# (npm-publication spec). Manually dispatched only — no push, pull_request,
+# or schedule trigger may ever start a publication. The channel/branch gate
+# runs first and fails the run before any build step:
+#   - snapshot:  develop only
+#   - rc:        develop or main
+#   - release:   main only
 #
-# BRIDGE (temporary): while the MIDNIGHTCI_NPMJS_TOKEN grant is unavailable,
-# the run distributes through GitHub Releases instead of the npmjs registry.
-# The operator creates and pushes the release tag (v<version>) on the release
-# commit and supplies it as the `tag` input; the run reconciles it before any
-# build step (exists, points at the dispatch commit, equals v<resolved
-# version>), re-executes the full repository gate, stamps the release version
-# statelessly (nothing is committed, tagged, or pushed), packs and
-# contract-checks the tarballs, consumer-tests them from the tarball,
-# generates SPDX SBOMs, uploads the release evidence (90-day retention),
-# creates the GitHub release (prerelease for rc, latest for release) with the
-# tarball + SHA256SUMS + SBOM + contract report, attests the assets, verifies
-# the uploaded digests, and consumer-tests the package from the release URL.
-# The suspended npmjs steps are kept (commented) with restore instructions —
-# see docs/guides/npmjs-publication.md, "Temporary distribution bridge".
+# Authentication is npm Trusted Publishing: the publish job runs inside the
+# protected `npm-release` GitHub environment with `id-token: write`; npm
+# (>= 11.5.1) exchanges the GitHub Actions OIDC token for a short-lived
+# publish token when the npmjs-side Trusted Publisher mapping matches
+# (organization midnightntwrk, repository midnight-verifiable-credential-
+# digital-passport, workflow filename publish.yml, environment npm-release).
+# No npm token secret exists — see docs/guides/npmjs-publication.md for the
+# trusted-publisher prerequisites. The workflow filename must stay
+# `publish.yml`: it is part of the npmjs Trusted Publisher mapping.
 
 on:
   workflow_dispatch:
@@ -36,10 +29,6 @@ on:
           - rc
           - release
         required: true
-      tag:
-        description: "Release tag (v<version>) the operator created on the dispatched commit; must match the resolved channel version"
-        type: string
-        required: true
       version:
         description: "Base semantic version; must match the root and package manifests (optional confirmation)"
         type: string
@@ -50,9 +39,7 @@ on:
         required: false
 
 permissions:
-  contents: write
-  id-token: write
-  attestations: write
+  contents: read
 
 # A publication must never be cancelled mid-flight by a newer dispatch.
 concurrency:
@@ -67,32 +54,19 @@ env:
 
 jobs:
   publish:
-    name: Gate, pack, and publish the GitHub release (bridge)
+    name: Gate, pack, and publish to npmjs
     runs-on: ubuntu-24.04
+    # Human gate + branch allow-list for the trusted-publishing identity.
+    environment: npm-release
     timeout-minutes: 60
     permissions:
-      contents: write
+      contents: read
       id-token: write
-      attestations: write
-    # ── BRIDGE (temporary): npmjs-registry authentication suspended ────────
-    # The org npm automation token. Consumed through .npmrc / the environment
-    # only — never workflow inputs, command arguments, repository files, or
-    # logs. RESTORE PROCEDURE (bridge exit): uncomment this env block together
-    # with the suspended npm CLI check, dist-tag snapshot, and publish / wait /
-    # verify / registry-consumer-test steps below; delete the bridge steps
-    # (tag reconciliation, sums + body, release create + digest verify,
-    # attestation, release-URL consumer test) and the `tag` input; restore the
-    # permissions to contents: read + id-token: write.
-    # env:
-    #   NODE_AUTH_TOKEN: ${{ secrets.MIDNIGHTCI_NPMJS_TOKEN }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # Full history and tags: the tag reconciliation step resolves the
-          # operator tag (refs/tags/<tag>) with a local git rev-parse, and the
-          # default shallow clone carries no tags at all.
           fetch-depth: 0
 
       - name: Resolve publication context (dispatch-only, channel/branch gate)
@@ -106,27 +80,6 @@ jobs:
           RELEASE_RC_INDEX: ${{ inputs.rc_index }}
         run: bash tooling/scripts/release-resolve-context.sh --channel "$RELEASE_CHANNEL" --version "$RELEASE_VERSION" --rc-index "$RELEASE_RC_INDEX"
 
-      # BRIDGE (temporary): the operator-owned release tag is reconciled
-      # immediately after the gate — before tool setup and the expensive
-      # repository gate — so tag/commit/version drift fails the run within
-      # seconds. The workflow never creates, moves, or deletes any ref.
-      - name: Reconcile the operator release tag (bridge; fail closed on drift)
-        env:
-          RELEASE_TAG: ${{ inputs.tag }}
-          RELEASE_CHANNEL: ${{ steps.context.outputs.channel }}
-          RELEASE_RC_INDEX: ${{ steps.context.outputs.rc-index }}
-          RELEASE_BASE_VERSION: ${{ steps.context.outputs.base-version }}
-          DISPATCH_SHA: ${{ github.sha }}
-        run: |
-          ARGS=(--tag "$RELEASE_TAG" --channel "$RELEASE_CHANNEL" --sha "$DISPATCH_SHA")
-          if [ -n "$RELEASE_RC_INDEX" ]; then
-            ARGS+=(--rc-index "$RELEASE_RC_INDEX")
-          fi
-          if [ -n "$RELEASE_BASE_VERSION" ]; then
-            ARGS+=(--base-version "$RELEASE_BASE_VERSION")
-          fi
-          node tooling/scripts/verify-release-tag.mjs "${ARGS[@]}"
-
       - name: Set up Node.js, pnpm, and Compact
         uses: ./.github/actions/setup-node-pnpm
         with:
@@ -134,15 +87,10 @@ jobs:
           github-token: ${{ github.token }}
           registry-url: ${{ env.NPM_REGISTRY }}
 
-      # ── BRIDGE (temporary): npmjs-registry steps suspended ────────────────
-      # Suspended with the token grant (restore procedure above, with the
-      # NODE_AUTH_TOKEN env block). The trusted-publishing CLI gate returns
-      # with the npmjs path at the bridge exit.
-      #
-      # - name: Check the npm CLI supports trusted publishing (OIDC path)
-      #   run: |
-      #     npm --version
-      #     node -e 'const v = require("child_process").execSync("npm --version").toString().trim(); const m = /^(\d+)\.(\d+)\.(\d+)/.exec(v); const p = m ? m.slice(1).map(Number) : [0, 0, 0]; const tooOld = p[0] < 11 || (p[0] === 11 && p[1] < 5) || (p[0] === 11 && p[1] === 5 && p[2] < 1); if (!m || tooOld) { throw new Error("npm " + v + " predates trusted-publishing support (needs >= 11.5.1)"); } console.log("npm CLI " + v + " supports trusted publishing");'
+      - name: Check the npm CLI supports trusted publishing (OIDC path)
+        run: |
+          npm --version
+          node -e 'const v = require("child_process").execSync("npm --version").toString().trim(); const m = /^(\d+)\.(\d+)\.(\d+)/.exec(v); const p = m ? m.slice(1).map(Number) : [0, 0, 0]; const tooOld = p[0] < 11 || (p[0] === 11 && p[1] < 5) || (p[0] === 11 && p[1] === 5 && p[2] < 1); if (!m || tooOld) { throw new Error("npm " + v + " predates trusted-publishing support (needs >= 11.5.1)"); } console.log("npm CLI " + v + " supports trusted publishing");'
 
       - name: Run the repository gate (security checks, lint, typecheck, build, tests, release tooling)
         run: pnpm run all
@@ -176,13 +124,8 @@ jobs:
       - name: Generate SPDX SBOMs for the packed tarballs
         run: node tooling/scripts/generate-release-sbom.mjs
 
-      # ── BRIDGE (temporary): the dist-tag snapshot is suspended with the ───
-      # npmjs path (no dist-tags exist to snapshot). Restore together with
-      # the publish steps below (restore procedure in the NODE_AUTH_TOKEN
-      # block).
-      #
-      # - name: Snapshot the npm dist-tags before publishing
-      #   run: node tooling/scripts/npm-release-state.mjs --snapshot --registry "$NPM_REGISTRY"
+      - name: Snapshot the npm dist-tags before publishing
+        run: node tooling/scripts/npm-release-state.mjs --snapshot --registry "$NPM_REGISTRY"
 
       - name: Upload the release evidence artifact (90-day retention)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -192,74 +135,38 @@ jobs:
           retention-days: 90
           if-no-files-found: error
 
-      # BRIDGE (temporary): SHA256SUMS over the tarball(s), SBOM(s), and the
-      # contract report, plus the generated release body (channel, version,
-      # install URL, checksums, verification one-liners, changelog link).
-      - name: Generate the release checksums and body (bridge)
+      # Trusted publishing: no NODE_AUTH_TOKEN — npm exchanges the GitHub
+      # OIDC token under id-token: write. Access and the channel's dist-tag
+      # ride on the publish invocation itself; the trusted-publishing identity
+      # cannot mutate dist-tags after the fact, so drift fails the run (see
+      # the runbook's escalation path). An already-published version with the
+      # correct tag is a tokenless idempotent no-op.
+      - name: Publish the tested tarballs to npmjs
         env:
-          RELEASE_TAG: ${{ inputs.tag }}
-          RELEASE_CHANNEL: ${{ steps.context.outputs.channel }}
-        run: node tooling/scripts/publish-github-release.mjs prepare --tag "$RELEASE_TAG" --channel "$RELEASE_CHANNEL" --repo "$GITHUB_REPOSITORY"
+          RELEASE_NPM_TAG: ${{ steps.version.outputs.npm-tag }}
+        run: bash tooling/scripts/publish-npm-packages.sh --npm-tag "$RELEASE_NPM_TAG"
 
-      # BRIDGE (temporary): creates the release on the operator tag (never
-      # moving it) with every asset — prerelease for rc (never latest),
-      # latest for release — or turns a rerun into a verified no-op; any
-      # digest drift fails closed. GH_TOKEN flows only through the env map.
-      - name: Create the GitHub release and verify the uploaded digests (bridge)
-        id: release
+      - name: Wait for registry propagation
         env:
-          RELEASE_TAG: ${{ inputs.tag }}
-          RELEASE_CHANNEL: ${{ steps.context.outputs.channel }}
-          GH_TOKEN: ${{ github.token }}
-        run: node tooling/scripts/publish-github-release.mjs publish --tag "$RELEASE_TAG" --channel "$RELEASE_CHANNEL" --repo "$GITHUB_REPOSITORY"
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_NPM_TAG: ${{ steps.version.outputs.npm-tag }}
+        run: node tooling/scripts/wait-for-npm-packages.mjs --version "$RELEASE_VERSION" --npm-tag "$RELEASE_NPM_TAG" --registry "$NPM_REGISTRY"
 
-      # BRIDGE (temporary): build-provenance attestations for every uploaded
-      # asset, by sha256 digest.
-      - name: Attest the release assets (build provenance)
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: |
-            tooling/artifacts/npm/*.tgz
-            tooling/artifacts/sbom/*.spdx.json
-            tooling/artifacts/contract-report.json
-            tooling/artifacts/SHA256SUMS
-
-      # BRIDGE (temporary): clean-consumer install from the just-created
-      # release's download URL — the exact path bridge consumers use.
-      - name: Run the release-URL consumer test (bridge)
+      - name: Verify the npm dist-tags (fail closed on drift)
         env:
-          RELEASE_URL: ${{ steps.release.outputs.release-url }}
-        run: node tooling/scripts/test-release-package-consumers.mjs --release-url "$RELEASE_URL"
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_NPM_TAG: ${{ steps.version.outputs.npm-tag }}
+        run: |
+          ARGS=(--verify --snapshot-file tooling/artifacts/npm-release-state.json --npm-tag "$RELEASE_NPM_TAG" --version "$RELEASE_VERSION" --registry "$NPM_REGISTRY")
+          if [ "$RELEASE_NPM_TAG" != "latest" ]; then
+            ARGS+=(--protect-latest)
+          fi
+          node tooling/scripts/npm-release-state.mjs "${ARGS[@]}"
 
-      # ── BRIDGE (temporary): the npmjs publish path is suspended ───────────
-      # (restore procedure in the NODE_AUTH_TOKEN block above.)
-      #
-      # - name: Publish the tested tarballs to npmjs
-      #   env:
-      #     RELEASE_NPM_TAG: ${{ steps.version.outputs.npm-tag }}
-      #   run: bash tooling/scripts/publish-npm-packages.sh --npm-tag "$RELEASE_NPM_TAG"
-      #
-      # - name: Wait for registry propagation
-      #   env:
-      #     RELEASE_VERSION: ${{ steps.version.outputs.version }}
-      #     RELEASE_NPM_TAG: ${{ steps.version.outputs.npm-tag }}
-      #   run: node tooling/scripts/wait-for-npm-packages.mjs --version "$RELEASE_VERSION" --npm-tag "$RELEASE_NPM_TAG" --registry "$NPM_REGISTRY"
-      #
-      # - name: Verify the npm dist-tags (fail closed on drift)
-      #   env:
-      #     RELEASE_VERSION: ${{ steps.version.outputs.version }}
-      #     RELEASE_NPM_TAG: ${{ steps.version.outputs.npm-tag }}
-      #   run: |
-      #     ARGS=(--verify --snapshot-file tooling/artifacts/npm-release-state.json --npm-tag "$RELEASE_NPM_TAG" --version "$RELEASE_VERSION" --registry "$NPM_REGISTRY")
-      #     if [ "$RELEASE_NPM_TAG" != "latest" ]; then
-      #       ARGS+=(--protect-latest)
-      #     fi
-      #     node tooling/scripts/npm-release-state.mjs "${ARGS[@]}"
-      #
-      # - name: Run the registry-mode consumer test
-      #   env:
-      #     RELEASE_VERSION: ${{ steps.version.outputs.version }}
-      #   run: node tooling/scripts/test-release-package-consumers.mjs --registry "$NPM_REGISTRY" --version "$RELEASE_VERSION"
+      - name: Run the registry-mode consumer test
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: node tooling/scripts/test-release-package-consumers.mjs --registry "$NPM_REGISTRY" --version "$RELEASE_VERSION"
 
       - name: Write the release summary
         if: always()
@@ -267,16 +174,15 @@ jobs:
           RELEASE_CHANNEL: ${{ steps.context.outputs.channel }}
           RELEASE_BRANCH: ${{ steps.context.outputs.branch }}
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
-          RELEASE_TAG: ${{ inputs.tag }}
-          RELEASE_URL: ${{ steps.release.outputs.release-url }}
+          RELEASE_NPM_TAG: ${{ steps.version.outputs.npm-tag }}
         run: |
           {
-            echo "## Publication summary (GitHub-Release bridge)"
+            echo "## Publication summary"
             echo ""
             echo "- channel: \`$RELEASE_CHANNEL\`"
             echo "- branch: \`$RELEASE_BRANCH\`"
             echo "- version: \`$RELEASE_VERSION\`"
-            echo "- tag: \`$RELEASE_TAG\`"
-            echo "- release: \`$RELEASE_URL\`"
-            echo "- registry (dependency resolution): \`${NPM_REGISTRY}\`"
+            echo "- npm tag: \`$RELEASE_NPM_TAG\`"
+            echo "- registry: \`${NPM_REGISTRY}\`"
+            echo "- authentication: npm trusted publishing (OIDC via the \`npm-release\` environment)"
           } >> "$GITHUB_STEP_SUMMARY"

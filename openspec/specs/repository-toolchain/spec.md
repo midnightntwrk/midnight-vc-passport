@@ -2,7 +2,7 @@
 
 Defines the repository's reproducible development and continuous-integration contract: the workspace layout, engine requirements, pinned Compact toolchain for local and CI builds, and the required CI lanes including security hygiene.
 
-The publication-workflow clause of the CI-lane self-check requirement is scoped to the period when the npmjs-registry publication path is active: during the temporary GitHub-Release bridge window (see the `github-release-distribution` capability) the publish step is suspended and the least-privilege publication permissions change shape, so the self-check instead pins the bridge publication shape exactly. Every other CI-lane obligation — lanes, fail-closed scanning, action pinning, checkout hygiene — is untouched, and the bridge-exit change restores the clause to its unconditional form.
+The publication-workflow clause of the CI-lane self-check requirement is in its unconditional, trusted-publishing form: the publish step authenticates through npm Trusted Publishing (OIDC), so the self-check pins the publication shape exactly — dispatch-only trigger, branch/channel gate, pinned public npmjs registry, provenance-enabled publish, protected `npm-release` environment, zero npm-token references, and least-privilege permissions (`contents: read` and `id-token: write`). Every other CI-lane obligation — lanes, fail-closed scanning, action pinning, checkout hygiene — is untouched.
 
 ## Requirements
 

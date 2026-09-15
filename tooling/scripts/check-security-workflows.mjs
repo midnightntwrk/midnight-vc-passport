@@ -96,15 +96,15 @@ const assertCheckoutsDoNotPersistCredentials = (workflow, relativePath) => {
 const PUBLISH_REGISTRY = "https://registry.npmjs.org/";
 
 /**
- * Dedicated assertions for the publication workflow (npm-publication +
- * github-release-distribution specs): dispatch-only trigger, branch/channel
- * gate present, operator-tag reconciliation present before any build step,
- * registry locked to the public npmjs registry, and the exact bridge
- * permission grant. Returns the list of violations (prefixed with
+ * Dedicated assertions for the publication workflow (npm-publication spec):
+ * dispatch-only trigger, channel/branch gate present, npm CLI
+ * trusted-publishing floor checked, registry locked to the public npmjs
+ * registry, the protected npm-release environment, zero npm-token
+ * references, and the exact least-privilege permission grant (contents:
+ * read, id-token: write — id-token is the trusted-publishing OIDC identity
+ * and the provenance signer). Returns the list of violations (prefixed with
  * `relativePath`); exported so the release-tooling tests can exercise
- * mutated copies of the workflow. The tag-reconciliation assertion is part
- * of the BRIDGE (temporary) shape: the bridge-exit change removes it
- * together with the bridge steps.
+ * mutated copies of the workflow.
  */
 export const assertPublishWorkflow = (workflow, relativePath) => {
   const violations = [];
@@ -146,45 +146,19 @@ export const assertPublishWorkflow = (workflow, relativePath) => {
     );
   }
 
-  // BRIDGE (temporary): the operator-tag reconciliation must run before any
-  // build step (setup or the repository gate) so tag drift fails the run
-  // within seconds.
-  const reconcileStepIndex = (steps) =>
-    steps.findIndex(
+  // The npm CLI trusted-publishing floor (>= 11.5.1) must be checked before
+  // the publish step: older CLIs cannot exchange the GitHub OIDC token.
+  const cliFloorPresent = Object.values(workflow.jobs ?? {}).some((job) =>
+    (job.steps ?? []).some(
       (step) =>
-        typeof step.run === "string" && step.run.includes("verify-release-tag.mjs"),
-    );
-  const reconcilePresent = Object.values(workflow.jobs ?? {}).some(
-    (job) => reconcileStepIndex(job.steps ?? []) !== -1,
+        typeof step.run === "string" &&
+        /supports trusted publishing/u.test(step.run),
+    ),
   );
-  if (!reconcilePresent) {
+  if (!cliFloorPresent) {
     violations.push(
-      "must reconcile the operator release tag (verify-release-tag.mjs) in a step",
+      "must verify the npm CLI supports trusted publishing before publishing",
     );
-  } else {
-    for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
-      const steps = job.steps ?? [];
-      const reconcile = reconcileStepIndex(steps);
-      if (reconcile === -1) {
-        continue;
-      }
-      const setupIndex = steps.findIndex(
-        (step) => typeof step.uses === "string" && step.uses.includes("setup-node-pnpm"),
-      );
-      const gateRunIndex = steps.findIndex(
-        (step) => typeof step.run === "string" && step.run.includes("pnpm run all"),
-      );
-      if (setupIndex !== -1 && reconcile > setupIndex) {
-        violations.push(
-          `job ${jobName} must reconcile the release tag before tool setup`,
-        );
-      }
-      if (gateRunIndex !== -1 && reconcile > gateRunIndex) {
-        violations.push(
-          `job ${jobName} must reconcile the release tag before the repository gate`,
-        );
-      }
-    }
   }
 
   // Registry lockdown: the publication path only ever talks to public npmjs.
@@ -194,23 +168,49 @@ export const assertPublishWorkflow = (workflow, relativePath) => {
     );
   }
 
-  // BRIDGE (temporary) least-privilege permissions: exactly what the GitHub
-  // release publication needs (release creation, provenance attestation
-  // signing, and attestation storage). The bridge-exit change restores the
-  // contents: read + id-token: write shape.
+  // Trusted publishing: the publishing job must run inside the protected
+  // npm-release environment (the npmjs Trusted Publisher mapping names it,
+  // and it carries the human gate) with exactly the least-privilege grant
+  // contents: read + id-token: write (id-token is both the OIDC publish
+  // identity and the provenance signer).
+  const publishJobs = Object.values(workflow.jobs ?? {}).filter((job) =>
+    (job.steps ?? []).some(
+      (step) =>
+        typeof step.run === "string" &&
+        step.run.includes("publish-npm-packages.sh"),
+    ),
+  );
+  if (publishJobs.length === 0) {
+    violations.push("must run publish-npm-packages.sh in a job");
+  }
+  for (const job of publishJobs) {
+    if (job.environment !== "npm-release") {
+      violations.push(
+        `the npm publish job must declare environment: npm-release (got '${job.environment}')`,
+      );
+    }
+  }
   for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
     const permissions = job.permissions ?? {};
     const permissionKeys = Object.keys(permissions);
     if (
-      permissionKeys.length !== 3 ||
-      permissions.contents !== "write" ||
-      permissions["id-token"] !== "write" ||
-      permissions.attestations !== "write"
+      permissionKeys.length !== 2 ||
+      permissions.contents !== "read" ||
+      permissions["id-token"] !== "write"
     ) {
       violations.push(
-        `job ${jobName} must grant exactly contents: write, id-token: write, and attestations: write`,
+        `job ${jobName} must grant exactly contents: read and id-token: write`,
       );
     }
+  }
+
+  // No npm token anywhere: trusted publishing authenticates through the
+  // OIDC exchange only, and no secret may override it.
+  const workflowText = JSON.stringify(workflow);
+  if (/NODE_AUTH_TOKEN|NPM_TOKEN|MIDNIGHTCI|secrets\./u.test(workflowText)) {
+    violations.push(
+      "must not reference any secret or npm token (trusted publishing uses the OIDC identity only)",
+    );
   }
 
   // Template-injection hygiene (zizmor template-injection): expressions must
@@ -389,7 +389,7 @@ const main = () => {
   }
 
   console.log(
-    "Security workflow contract is valid: branch coverage, dedicated Scorecard publication, public dependency review, Dependabot, immutable action refs, checkout credential hygiene, and the publication workflow contract (dispatch-only trigger, channel gate, tag reconciliation, locked npmjs registry, bridge permissions: contents write, id-token write, attestations write).",
+    "Security workflow contract is valid: branch coverage, dedicated Scorecard publication, public dependency review, Dependabot, immutable action refs, checkout credential hygiene, and the publication workflow contract (dispatch-only trigger, channel gate, npm CLI trusted-publishing floor, locked npmjs registry, protected npm-release environment, zero token references, permissions: contents read + id-token write).",
   );
 };
 

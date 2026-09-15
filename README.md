@@ -20,11 +20,6 @@ source-level coupling to the monorepo.
 
 ## Installation
 
-> **Temporary bridge:** while the package is not yet on the npmjs registry,
-> install it from GitHub Releases — see
-> [Installing from GitHub Releases (temporary bridge)](#installing-from-github-releases-temporary-bridge)
-> below. The npmjs install path below applies once the bridge exits.
-
 Install the published release-candidate line (the first stable `0.1.0`
 follows from `main` once the rc line is verified):
 
@@ -37,52 +32,13 @@ npm install @midnight-ntwrk/midnight-verifiable-credential-digital-passport@rc
 > stable release). The exact live version is recorded here after the first
 > publication dispatch — see the
 > [publication runbook](docs/guides/npmjs-publication.md) for the release
-> train (channels, branch rules, dist-tags, and rollback).
+> train (channels, branch rules, dist-tags, trusted publishing, and
+> rollback).
 
-## Installing from GitHub Releases (temporary bridge)
-
-While the npmjs publication path is suspended (see the
-[publication runbook](docs/guides/npmjs-publication.md)), every release is
-published as a GitHub Release carrying the packed tarball, a SHA256SUMS
-file, the SPDX SBOM, the package-contract report, and build-provenance
-attestations. Any downstream repository can consume it without waiting for
-the registry: pin the **versioned** release-download URL directly in your
-manifest's `dependencies`:
-
-```json
-{
-  "dependencies": {
-    "@midnight-ntwrk/midnight-verifiable-credential-digital-passport": "https://github.com/midnightntwrk/midnight-verifiable-credential-digital-passport/releases/download/v0.1.0-rc1/midnight-ntwrk-midnight-verifiable-credential-digital-passport-0.1.0-rc1.tgz"
-  }
-}
-```
-
-Then `npm install` / `pnpm install` as usual: the tarball's transitive
-dependencies resolve from the public npmjs registry, and your **lockfile
-freezes the URL** — installs are reproducible and never silently move. To
-upgrade, edit the URL to the newer release (a one-line change) and refresh
-the lockfile. Prefer the versioned URL over any unversioned convenience
-form; a pinned version can never jump underneath you.
-
-Notes for consumer tooling:
-
-- A direct URL dependency is a **first-class dependency**, not an exotic
-  *sub*dependency — no `blockExoticSubdeps`-style exemption is needed for it.
-- A URL dependency carries **no registry publish date**, so registry
-  release-age floors (`minimumReleaseAge`-style policies) do not apply to it.
-
-Optional verification (documented, not mandated) after downloading the
-assets of a release:
-
-```sh
-sha256sum --check SHA256SUMS   # checksums for every release asset
-gh attestation verify --repo midnightntwrk/midnight-verifiable-credential-digital-passport \
-  midnight-ntwrk-midnight-verifiable-credential-digital-passport-0.1.0-rc1.tgz
-```
-
-This bridge is temporary: when the npmjs path is restored, the usual
-`npm install @midnight-ntwrk/midnight-verifiable-credential-digital-passport`
-flow returns and the pinned URLs keep working until you migrate.
+> Historical note: before the first registry publication, releases were
+> distributed through GitHub Releases (tarballs attached to tagged
+> releases). Those releases remain downloadable at their pinned URLs; new
+> installs should use the registry path above.
 
 ## Repository layout
 

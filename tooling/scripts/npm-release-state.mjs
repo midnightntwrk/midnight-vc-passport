@@ -22,11 +22,12 @@
 // CLI:
 //   npm-release-state.mjs --snapshot [--out <file>] [--registry <url>] [--view-cmd <cmd>]
 //   npm-release-state.mjs --verify [--snapshot-file <file>] [--version <v>] [--npm-tag <tag>]
-//                          [--protect-latest] [--repair] [--registry <url>]
-//                          [--view-cmd <cmd>] [--dist-tag-cmd <cmd>]
+//                          [--protect-latest] [--registry <url>] [--view-cmd <cmd>]
 //
-// --view-cmd (default "npm view") and --dist-tag-cmd (default "npm dist-tag")
-// allow the tooling tests to substitute a mocked registry view.
+// --view-cmd (default "npm view") allows the tooling tests to substitute a
+// mocked registry view. There is deliberately no repair mode: npm trusted
+// publishing authorizes publication only, never dist-tag mutation — drift
+// fails closed and is escalated per the runbook.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -70,26 +71,6 @@ const viewDistTags = (name, { viewCmd, registry }) => {
   return JSON.parse(result.stdout);
 };
 
-const setDistTag = (name, version, tag, { distTagCmd, registry }) => {
-  const result = spawnSync(
-    splitCommand(distTagCmd)[0],
-    [
-      ...splitCommand(distTagCmd).slice(1),
-      "add",
-      `${name}@${version}`,
-      tag,
-      "--registry",
-      registry,
-    ],
-    { encoding: "utf8" },
-  );
-  if (result.status !== 0) {
-    throw new Error(
-      `dist-tag repair failed for ${name}@${version} -> ${tag}: ${result.stderr || result.stdout}`,
-    );
-  }
-};
-
 const parseArgs = (argv) => {
   const options = {
     snapshot: false,
@@ -99,10 +80,8 @@ const parseArgs = (argv) => {
     version: null,
     npmTag: null,
     protectLatest: false,
-    repair: false,
     registry: process.env.NPM_REGISTRY ?? NPM_PUBLIC_REGISTRY,
     viewCmd: process.env.NPM_VIEW_COMMAND ?? "npm view",
-    distTagCmd: process.env.NPM_DIST_TAG_COMMAND ?? "npm dist-tag",
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -128,17 +107,11 @@ const parseArgs = (argv) => {
       case "--protect-latest":
         options.protectLatest = true;
         break;
-      case "--repair":
-        options.repair = true;
-        break;
       case "--registry":
         options.registry = argv[++index];
         break;
       case "--view-cmd":
         options.viewCmd = argv[++index];
-        break;
-      case "--dist-tag-cmd":
-        options.distTagCmd = argv[++index];
         break;
       default:
         throw new Error(`unknown argument ${arg}`);
@@ -157,9 +130,6 @@ const parseArgs = (argv) => {
   }
   if (options.protectLatest && options.version === null) {
     throw new Error("--protect-latest requires --version");
-  }
-  if (options.repair && (options.npmTag === null || options.version === null)) {
-    throw new Error("--repair requires --npm-tag and --version");
   }
   return options;
 };
@@ -194,7 +164,6 @@ const main = () => {
   }
   const snapshot = JSON.parse(readFileSync(snapshotFile, "utf8"));
   const failures = [];
-  const repairs = [];
 
   for (const name of names) {
     const before = snapshot.packages?.[name]?.distTags;
@@ -206,18 +175,9 @@ const main = () => {
 
     if (options.npmTag !== null) {
       if (after[options.npmTag] !== options.version) {
-        if (options.repair) {
-          setDistTag(name, options.version, options.npmTag, options);
-          repairs.push(`${name}: dist-tag '${options.npmTag}' repaired to ${options.version}`);
-          const repaired = viewDistTags(name, options);
-          if (repaired[options.npmTag] !== options.version) {
-            failures.push(`${name}: dist-tag '${options.npmTag}' repair did not take effect`);
-          }
-        } else {
-          failures.push(
-            `${name}: dist-tag '${options.npmTag}' resolves to ${after[options.npmTag] ?? "<unset>"} but ${options.version} was expected`,
-          );
-        }
+        failures.push(
+          `${name}: dist-tag '${options.npmTag}' resolves to ${after[options.npmTag] ?? "<unset>"} but ${options.version} was expected (trusted publishing cannot repair dist-tags; escalate per the runbook)`,
+        );
       }
     }
 
@@ -243,9 +203,6 @@ const main = () => {
     }
   }
 
-  for (const repair of repairs) {
-    console.log(`[npm-release-state] ${repair}`);
-  }
   if (failures.length > 0) {
     for (const failure of failures) {
       console.error(`[npm-release-state] ${failure}`);
@@ -253,7 +210,7 @@ const main = () => {
     process.exit(1);
   }
   console.log(
-    `[npm-release-state] dist-tags verified${options.repair ? " (with repair)" : ""} for ${names.length} package(s)`,
+    `[npm-release-state] dist-tags verified for ${names.length} package(s)`,
   );
 };
 

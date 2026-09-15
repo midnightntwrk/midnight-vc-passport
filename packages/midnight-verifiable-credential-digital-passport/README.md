@@ -262,37 +262,10 @@ with the `npm-artifacts-contents` flake check guarding the tarball contents
 (dist output, compact sources, scripts, no managed source maps, version
 consistency).
 
-### Installing from GitHub Releases (temporary bridge)
-
-While the package is not yet published to the npmjs registry (see the
-[publication runbook](https://github.com/midnightntwrk/midnight-verifiable-credential-digital-passport/blob/main/docs/guides/npmjs-publication.md)),
-every release is attached to a GitHub Release and can be consumed by any
-downstream repository through the **versioned** release-download URL pinned
-directly in the manifest `dependencies`:
-
-```json
-{
-  "dependencies": {
-    "@midnight-ntwrk/midnight-verifiable-credential-digital-passport": "https://github.com/midnightntwrk/midnight-verifiable-credential-digital-passport/releases/download/v0.1.0-rc1/midnight-ntwrk-midnight-verifiable-credential-digital-passport-0.1.0-rc1.tgz"
-  }
-}
-```
-
-The lockfile freezes the URL (reproducible installs; it never silently
-moves); upgrading is a one-line URL edit followed by a lockfile refresh.
-Transitive dependencies resolve from the public npmjs registry. A direct URL
-dependency is not an exotic *sub*dependency (no exemption needed in exotic-
-dependency policies) and carries no registry publish date (release-age
-floors do not apply). Optional per-release verification:
-
-```sh
-sha256sum --check SHA256SUMS   # checksums shipped with every release
-gh attestation verify --repo midnightntwrk/midnight-verifiable-credential-digital-passport \
-  midnight-ntwrk-midnight-verifiable-credential-digital-passport-0.1.0-rc1.tgz
-```
-
-The bridge is temporary — the plain registry install returns once the npmjs
-publication path is restored.
+Historical note: before the first registry publication, releases were
+distributed through versioned GitHub Release download URLs; those releases
+remain downloadable at their pinned URLs, and new installs should use the
+registry path above.
 
 ## Related docs
 

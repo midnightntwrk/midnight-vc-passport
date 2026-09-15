@@ -32,16 +32,6 @@
 //     node tooling/scripts/test-release-package-consumers.mjs --registry <url> --version <version>
 //     Install the published version — and its transitive dependencies — from
 //     the public registry and run the same round-trip.
-//
-//   release-url mode (github-release-distribution: "Release-URL consumer
-//   verification"; BRIDGE temporary):
-//     node tooling/scripts/test-release-package-consumers.mjs --release-url <url>
-//     Install the package from the versioned release-download URL of the
-//     just-published GitHub release — dependencies resolve from the public
-//     npmjs registry — and run the same round-trip. This is the exact install
-//     path documented for bridge consumers (a direct URL dependency pinned in
-//     the manifest), proving the real distribution channel end-to-end. https
-//     is required; plain http is accepted only for localhost test harnesses.
 
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
@@ -61,7 +51,7 @@ const NETWORK_ID = "@midnight-ntwrk/midnight-js-network-id";
 const SEMVER = /^\d+\.\d+\.\d+(-[\w.-]+)?$/u;
 
 // Test hook: the round-trip runner can be swapped (offline tooling tests
-// exercise the release-url harness against a local HTTP server). Unset in CI,
+// exercise the harness against a local HTTP server). Unset in CI,
 // where the real smoke round-trip runs.
 const ROUND_TRIP = process.env.RELEASE_CONSUMER_ROUND_TRIP
   ?? path.join(repoRoot, "packages/smoke-consumer/scripts/round-trip.mjs");
@@ -91,7 +81,7 @@ const run = (cmd, args, options = {}) => {
 
 /** Argument validation shared by the entry styles (covered by tooling tests). */
 export const parseConsumerArgs = (argv) => {
-  const options = { registry: null, version: null, artifactsDir: null, releaseUrl: null, mode: "tarball" };
+  const options = { registry: null, version: null, artifactsDir: null, mode: "tarball" };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--registry") {
@@ -100,35 +90,9 @@ export const parseConsumerArgs = (argv) => {
       options.version = argv[++index];
     } else if (arg === "--artifacts-dir") {
       options.artifactsDir = argv[++index];
-    } else if (arg === "--release-url") {
-      options.releaseUrl = argv[++index];
     } else {
       throw new Error(`unknown argument ${arg}`);
     }
-  }
-  if (options.releaseUrl !== null) {
-    if (options.registry !== null || options.version !== null || options.artifactsDir !== null) {
-      throw new Error("--release-url cannot be combined with --registry/--version/--artifacts-dir");
-    }
-    let parsed;
-    try {
-      parsed = new URL(options.releaseUrl);
-    } catch {
-      throw new Error(`--release-url must be a URL (got ${options.releaseUrl})`);
-    }
-    if (
-      parsed.protocol !== "https:" &&
-      !(parsed.protocol === "http:" && /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/u.test(parsed.host))
-    ) {
-      throw new Error(
-        `--release-url must be an https release-download URL (http is only accepted for localhost test harnesses; got ${options.releaseUrl})`,
-      );
-    }
-    if (!parsed.pathname.endsWith(".tgz")) {
-      throw new Error(`--release-url must point at a packed .tgz asset (got ${options.releaseUrl})`);
-    }
-    options.mode = "release-url";
-    return options;
   }
   if (options.registry !== null || options.version !== null) {
     if (options.registry === null || options.version === null) {
@@ -245,27 +209,6 @@ const testRegistry = (registry, version) => {
   }
 };
 
-/**
- * Release-url mode (BRIDGE temporary): installs the package exactly the way
- * bridge consumers do — the versioned release-download URL pinned as a direct
- * dependency — with transitive dependencies resolved from the public npmjs
- * registry. Reuses the clean-project harness and the round-trip; the remote
- * tarball is fetched by pnpm itself into its content-addressed store (the
- * ENAMETOOLONG workaround is a local-path concern only).
- */
-const testReleaseUrl = (releaseUrl) => {
-  const isolated = cleanProject();
-  console.log(`release-url consumer: clean project at ${isolated}`);
-  try {
-    console.log(`release-url consumer: installing ${releaseUrl}`);
-    run("pnpm", ["add", releaseUrl, NETWORK_ID], { cwd: isolated });
-    consumerRoundTrip(isolated, { label: "release-url consumer" });
-    console.log(`release-url consumer: PASS for ${releaseUrl}`);
-  } finally {
-    rmSync(isolated, { recursive: true, force: true });
-  }
-};
-
 const main = async () => {
   if (!existsSync(ROUND_TRIP)) {
     fail(`round-trip runner not found at ${ROUND_TRIP}`);
@@ -280,11 +223,6 @@ const main = async () => {
 
   if (options.mode === "registry") {
     testRegistry(options.registry, options.version);
-    return;
-  }
-
-  if (options.mode === "release-url") {
-    testReleaseUrl(options.releaseUrl);
     return;
   }
 

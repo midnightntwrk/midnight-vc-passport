@@ -77,17 +77,6 @@ case "$CHANNEL" in
     ;;
 esac
 
-# BRIDGE (temporary): GitHub-Release distribution bridge — the channel input
-# must keep offering snapshot|rc|release (the workflow self-check pins those
-# options), but snapshot is structurally incompatible with the operator-owned
-# release tags the bridge requires: a run-number-stamped version cannot be
-# known before the operator creates the tag. Fail closed here, before any
-# build step. Remove this guard when the bridge exits (see
-# docs/guides/npmjs-publication.md, "Temporary distribution bridge").
-if [ "${CHANNEL}" = "snapshot" ]; then
-  fail "channel 'snapshot' is not available during the GitHub-Release bridge: run-number-stamped snapshot versions cannot be pre-tagged by an operator (dispatch 'rc' or 'release' instead)"
-fi
-
 # Manual dispatch only: no automated (push-event) publication may exist.
 if [ -z "${GITHUB_EVENT_NAME:-}" ]; then
   fail "GITHUB_EVENT_NAME is not set; this script runs inside the publish workflow"
