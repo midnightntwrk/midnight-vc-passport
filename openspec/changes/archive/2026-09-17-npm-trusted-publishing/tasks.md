@@ -28,5 +28,5 @@
 ## 5. Spec housekeeping and verification
 
 - [x] 5.1 Update `openspec/specs/npm-publication/spec.md` and `openspec/specs/repository-toolchain/spec.md` Purposes to drop their bridge-window scoping paragraphs (direct edits; the deltas only carry requirement changes).
-- [ ] 5.2 Retire `openspec/specs/github-release-distribution/` at archive time (all requirements are removed by this change's delta).
+- [x] 5.2 Retire `openspec/specs/github-release-distribution/` at archive time (all requirements are removed by this change's delta).
 - [x] 5.3 `openspec validate npm-trusted-publishing --strict` passes; `openspec status` shows all artifacts complete.

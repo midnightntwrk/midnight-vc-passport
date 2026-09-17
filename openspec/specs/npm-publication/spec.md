@@ -61,9 +61,23 @@ The publication workflow SHALL, in its own run and before any publish step: re-r
 - **WHEN** any gate, pack, contract-check, or tarball consumer test step fails
 - **THEN** the workflow fails and no publish step runs
 
-### Requirement: Registry publication with provenance
+### Requirement: Trusted-publisher configuration prerequisite
 
-When the npmjs-registry publication path is active, the workflow SHALL publish the tested tarballs to `https://registry.npmjs.org/` only, with public access, the channel's npm dist-tag, and npm provenance enabled, authenticated with the organization's npm automation token available to the workflow as a secret. The workflow SHALL NOT place the token in workflow inputs, command arguments, repository files, or logs. The workflow SHALL verify before use that the available npm CLI supports trusted publishing, so the authentication path can later move to npm OIDC without workflow changes. The path is inactive during the GitHub-Release bridge window (see the `github-release-distribution` capability): no publish step runs, and this requirement is suspended until the bridge-exit change restores it.
+The publication workflow SHALL fail closed at the publish step — publishing nothing — unless npm Trusted Publishing is available to it: the npmjs Trusted Publisher mapping for `@midnight-ntwrk/midnight-verifiable-credential-digital-passport` (organization `midnightntwrk`, repository `midnight-verifiable-credential-digital-passport`, workflow filename `publish.yml`, GitHub environment `npm-release`) created by npm organization owners, and the protected `npm-release` GitHub environment configured by repository owners. No npm token secret SHALL be provisioned, referenced, or required. The publication runbook SHALL name both owner actions as prerequisites, and the repository's tooling SHALL NOT attempt registry administration (access grants or dist-tag repair) that the trusted-publishing identity cannot perform.
+
+#### Scenario: Missing trusted-publisher mapping fails closed
+
+- **WHEN** a publication is dispatched before the npmjs Trusted Publisher mapping exists
+- **THEN** the publish step fails without publishing anything to the registry
+
+#### Scenario: Protected environment gates the publish job
+
+- **WHEN** the publish job starts
+- **THEN** it runs only inside the protected `npm-release` environment, whose configuration requires reviewers, prevents self-review, and allows only the `main` and `develop` branches
+
+### Requirement: Registry publication with trusted publishing
+
+The publication workflow SHALL publish the tested tarballs to `https://registry.npmjs.org/` only, with public access, the channel's npm dist-tag, and npm provenance enabled. Authentication SHALL be npm Trusted Publishing: the publish job SHALL run with `id-token: write` in the protected `npm-release` GitHub environment and SHALL NOT reference any npm token secret in environment variables, workflow inputs, command arguments, repository files, or logs. Public access and the channel's dist-tag SHALL be applied as arguments of the publish invocation itself, because the trusted-publishing identity cannot perform post-publish `npm access` or `npm dist-tag` mutations, and the workflow SHALL NOT attempt them. The workflow SHALL verify, before publishing, that the available npm CLI supports trusted publishing (npm ≥ 11.5.1).
 
 #### Scenario: Publication is public with provenance
 
@@ -75,14 +89,19 @@ When the npmjs-registry publication path is active, the workflow SHALL publish t
 - **WHEN** the publish step is configured with any registry other than the public npmjs registry
 - **THEN** the workflow fails before publishing
 
-#### Scenario: Suspended during the bridge window
+#### Scenario: No token anywhere
 
-- **WHEN** the GitHub-Release bridge is active and a publication is dispatched
-- **THEN** no publish step runs and nothing is published to the npmjs registry
+- **WHEN** the publication workflow definition and its scripts are inspected
+- **THEN** no npm token secret is referenced, and the publish job carries `id-token: write` plus the `npm-release` environment
+
+#### Scenario: Tag and access ride on the publish command
+
+- **WHEN** the publish step runs
+- **THEN** public access and the channel's dist-tag are requested by the publish invocation itself, and no separate dist-tag or access mutation command runs
 
 ### Requirement: Dist-tag safety and idempotency
 
-When the npmjs-registry publication path is active, the workflow SHALL, before publishing, snapshot the relevant npm dist-tags and, after publishing, verify them and fail closed on unexpected drift, in particular protecting an existing `latest` tag during `snapshot` and `rc` publications. On the very first publication of a package — when no `latest` exists to protect — the workflow SHALL tolerate the registry setting `latest` to the just-published version (unavoidable npmjs behavior) and fail only if `latest` resolves to any other version. Re-running the workflow for an already-published version and dist-tag SHALL be a no-op that succeeds without republishing. During the GitHub-Release bridge window (see the `github-release-distribution` capability) no npmjs publication occurs and this requirement is suspended until the bridge exits.
+The workflow SHALL, before publishing, snapshot the relevant npm dist-tags by read-only inspection of the public registry and, after publishing, verify them and fail closed on unexpected drift, in particular protecting an existing `latest` tag during `snapshot` and `rc` publications. A drifted dist-tag SHALL NOT be repaired by the workflow — repair requires registry authority the trusted-publishing identity does not have — so drift fails the run and the runbook SHALL direct the operator to the escalation path. On the very first publication of a package — when no `latest` exists to protect — the workflow SHALL tolerate the registry setting `latest` to the just-published version (unavoidable npmjs behavior) and fail only if `latest` resolves to any other version. Re-running the workflow for an already-published version and dist-tag SHALL be a tokenless no-op that succeeds without republishing: the run verifies from the public registry that the immutable version exists with the requested tag already applied.
 
 #### Scenario: latest protected during prerelease
 
@@ -97,11 +116,16 @@ When the npmjs-registry publication path is active, the workflow SHALL, before p
 #### Scenario: Idempotent rerun
 
 - **WHEN** the workflow is re-dispatched with the same channel, version, and index after a successful publication
-- **THEN** the run succeeds as a no-op without publishing a new dist-tag state
+- **THEN** the run succeeds as a tokenless no-op, having verified from the public registry that the version exists with the requested tag, and publishes nothing new
+
+#### Scenario: Drift is not repaired
+
+- **WHEN** the post-publish verification finds a dist-tag resolving to an unexpected version
+- **THEN** the workflow fails and no registry mutation is attempted from within the run
 
 ### Requirement: Post-publication registry verification
 
-When the npmjs-registry publication path is active, the workflow SHALL, after publishing, wait for the version to propagate on the public registry, verify the expected dist-tags, and run a clean-consumer installation test that resolves the published version — and its transitive dependencies — from the public registry. During the GitHub-Release bridge window (see the `github-release-distribution` capability) these steps are suspended together with publication itself; the bridge's release-URL consumer verification applies instead.
+The publication workflow SHALL, after publishing, wait for the version to propagate on the public registry, verify the expected dist-tags, and run a clean-consumer installation test that resolves the published version — and its transitive dependencies — from the public registry.
 
 #### Scenario: Propagation wait and tag verification
 
@@ -113,25 +137,25 @@ When the npmjs-registry publication path is active, the workflow SHALL, after pu
 - **WHEN** the registry-mode consumer test runs
 - **THEN** a fresh project installs the published version from npmjs and the consumer round-trip passes
 
-### Requirement: Release evidence
+### Requirement: Release evidence and retention
 
-When the npmjs-registry publication path is active, the publication workflow SHALL generate an SPDX SBOM for each packed tarball and upload a release-evidence artifact containing the tested tarballs, the dist-tag state snapshot, and the SBOMs, retained for at least 90 days. During the GitHub-Release bridge window (see the `github-release-distribution` capability) no npm dist-tag state exists — the dist-tag snapshot step is suspended together with publication itself — so the evidence artifact SHALL instead contain the tested tarballs and their SPDX SBOMs, retained for at least 90 days; the bridge's additional integrity evidence (SHA256SUMS, contract report, artifact attestations) is carried by the GitHub release assets.
+The publication workflow SHALL generate an SPDX SBOM for each packed tarball and upload a release-evidence artifact containing the tested tarballs, the dist-tag state snapshot, and the SBOMs, retained for at least 90 days.
 
 #### Scenario: Evidence artifact per publication
 
-- **WHEN** a publication run completes with the npmjs-registry path active
+- **WHEN** a publication run completes
 - **THEN** the run's artifact contains the published tarballs, their SPDX SBOMs, and the recorded npm release state
-
-#### Scenario: Evidence continues during the bridge
-
-- **WHEN** a bridged publication run completes
-- **THEN** the run's evidence artifact contains the tested tarballs and their SPDX SBOMs, retained for at least 90 days
 
 ### Requirement: Publication runbook
 
-The repository SHALL carry a publication runbook document covering ownership (technical, credentials, security escalation), authentication and token policy, pre-dispatch gates, the first-release dispatch procedure, post-publication verification, retry and rollback, and incident response.
+The repository SHALL carry a publication runbook document covering ownership (technical, release authority, security escalation), trusted-publisher prerequisites (the npmjs Trusted Publisher mapping and the `npm-release` environment configuration — both owner actions outside the repository), pre-dispatch gates, the first-release dispatch procedure, post-publication verification, retry and rollback, and incident response including the registry-authority escalation path for dist-tag drift. The runbook SHALL NOT instruct any operator to provision or supply an npm token.
 
 #### Scenario: Runbook covers the operator path
 
 - **WHEN** a release operator follows the runbook
-- **THEN** it names the owners, the required secret, the dispatch inputs, and the verification and rollback steps for a publication
+- **THEN** it names the owners, the trusted-publisher prerequisites, the dispatch inputs, and the verification, rollback, and escalation steps for a publication
+
+#### Scenario: No token provisioning is documented
+
+- **WHEN** the publication runbook is inspected
+- **THEN** it contains no instruction to create, configure, or supply an npm token secret
