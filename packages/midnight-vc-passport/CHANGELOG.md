@@ -1,7 +1,7 @@
 # Changelog
 
 All notable changes to the
-`@midnight-ntwrk/midnight-verifiable-credential-digital-passport` package will
+`@midnight-ntwrk/midnight-vc-passport` package will
 be documented in this file. Repository-level changes (CI, tooling, docs) are
 tracked in the [root changelog](../../CHANGELOG.md); this file tracks what
 ships in the published tarball.
@@ -18,6 +18,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   semver-pinned dependencies with no `workspace:`/`file:`/git/URL entries.
 
 ### Changed
+
+- Renamed the package to **`@midnight-ntwrk/midnight-vc-passport`** (workspace
+  directory `packages/midnight-vc-passport`). The package was never published
+  under the old name, so no deprecation or migration applies; the version
+  remains `0.1.0` and the first npmjs release simply publishes under the new
+  name. On-chain identifiers (`midnight:vc:digital-passport`,
+  `digital-passport:v1`) are unaffected.
 
 - Pinned the Compact toolchain at **0.31.1** (was 0.30.0). Generated managed
   code is unchanged (byte-identical artifacts); the compiler now natively

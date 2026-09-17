@@ -9,7 +9,7 @@ monorepo into an independent repository with its own ownership, versioning, and
 release train. Consumers install it as a normal npm package; there is no
 source-level coupling to the monorepo.
 
-- **Head package:** [`@midnight-ntwrk/midnight-verifiable-credential-digital-passport`](packages/midnight-verifiable-credential-digital-passport)
+- **Head package:** [`@midnight-ntwrk/midnight-vc-passport`](packages/midnight-vc-passport)
   — the credential family: five committed claims, selective disclosures, an
   age-over-threshold predicate, presentation requests, validation circuits,
   explicit holder binding, no-status binding, and the protocol model.
@@ -24,7 +24,7 @@ Install the published release-candidate line (the first stable `0.1.0`
 follows from `main` once the rc line is verified):
 
 ```sh
-npm install @midnight-ntwrk/midnight-verifiable-credential-digital-passport@rc
+npm install @midnight-ntwrk/midnight-vc-passport@rc
 ```
 
 > **Live version:** the first published release candidate is
@@ -44,7 +44,7 @@ npm install @midnight-ntwrk/midnight-verifiable-credential-digital-passport@rc
 
 ```
 packages/
-  midnight-verifiable-credential-digital-passport/   # the credential family (publishable-ready)
+  midnight-vc-passport/   # the credential family (publishable-ready)
   smoke-consumer/                                    # private consumer boundary evidence
 flake.nix                                            # dev shell + hermetic npm-artifacts tarball output
 nix/                                                 # offline dependency fetch and per-package tarball derivations
@@ -78,7 +78,7 @@ pnpm run all           # lint && typecheck && build && test:ci (turbo pipeline)
 ```
 
 Other useful tasks: `pnpm run smoke` (consumer boundary round-trip),
-`pnpm run clean`, `pnpm --filter @midnight-ntwrk/midnight-verifiable-credential-digital-passport test`.
+`pnpm run clean`, `pnpm --filter @midnight-ntwrk/midnight-vc-passport test`.
 
 ## Consuming the npm tarballs from another repository
 
@@ -92,7 +92,7 @@ nix build github:midnightntwrk/midnight-verifiable-credential-digital-passport#n
 
 The output is a flat directory containing one `.tgz` per publishable
 (non-private) workspace package — currently
-`midnight-ntwrk-midnight-verifiable-credential-digital-passport-0.1.0.tgz` —
+`midnight-ntwrk-midnight-vc-passport-0.1.0.tgz` —
 packed by the same `prepack` pipeline the CI smoke lane exercises (compact
 compile, TypeScript build, artifact copies). Dependencies resolve offline from
 a lockfile-pinned fixed-output fetch; the Compact compiler and circuit
@@ -110,7 +110,7 @@ publishable package under `packages/` flows into this output automatically.
 > advisory-driven override (`nanoid@3.3.18`, GHSA-2v37-7h3g-55p8) in the
 > dev-tooling chain; it does not touch the publishable manifest or its
 > dependency policy. See the package
-> [README](packages/midnight-verifiable-credential-digital-passport/README.md)
+> [README](packages/midnight-vc-passport/README.md)
 > and [design](openspec/changes/extract-digital-passport-credential/design.md) for details.
 
 ## Continuous integration

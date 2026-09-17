@@ -57,8 +57,8 @@ import { parse as parseYaml } from "yaml";
 
 const SCRIPTS = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPTS, "../..");
-const FAMILY = "@midnight-ntwrk/midnight-verifiable-credential-digital-passport";
-const FAMILY_PATH = "packages/midnight-verifiable-credential-digital-passport";
+const FAMILY = "@midnight-ntwrk/midnight-vc-passport";
+const FAMILY_PATH = "packages/midnight-vc-passport";
 const NPMJS = "https://registry.npmjs.org/";
 
 const node = (args, options = {}) =>
@@ -674,7 +674,7 @@ test("release package contract: emits a deterministic machine-readable report on
     assert.equal(report.version, "0.1.0");
     assert.deepEqual(report.tarballs, [
       {
-        tarball: "midnight-ntwrk-midnight-verifiable-credential-digital-passport-0.1.0.tgz",
+        tarball: "midnight-ntwrk-midnight-vc-passport-0.1.0.tgz",
         passed: true,
         violations: [],
       },

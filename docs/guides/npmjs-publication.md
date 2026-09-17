@@ -1,7 +1,7 @@
 # npmjs publication runbook
 
 This is the operator runbook for publishing
-`@midnight-ntwrk/midnight-verifiable-credential-digital-passport` to the public
+`@midnight-ntwrk/midnight-vc-passport` to the public
 npm registry. It is adapted from the sibling
 [`midnight-verifiable-credentials`](https://github.com/midnightntwrk/midnight-verifiable-credentials)
 publication runbook, reduced to this repository's single publishable package.
@@ -38,7 +38,7 @@ can be created from repository code; both are attested by their owners:
 
 1. **npmjs Trusted Publisher mapping** (npm organization owner, on
    <https://www.npmjs.com>): for the package
-   `@midnight-ntwrk/midnight-verifiable-credential-digital-passport`, create a
+   `@midnight-ntwrk/midnight-vc-passport`, create a
    Trusted Publisher with exactly:
 
    | Field               | Value                                                       |
@@ -101,7 +101,7 @@ Before dispatching any publication, verify:
    itself, but a red CI lane means the dispatch will waste a run and fail.
 3. **Catalog is tight:** `node tooling/scripts/workspace-catalog.mjs
    --publishable-paths` prints exactly
-   `packages/midnight-verifiable-credential-digital-passport`. If any other
+   `packages/midnight-vc-passport`. If any other
    workspace appears, stop and fix the catalog first — private evidence
    workspaces (e.g. the smoke consumer) must never be publishable.
 4. **Version and changelog current:** the root and family package manifests
@@ -149,9 +149,9 @@ The first publication creates the package in the `@midnight-ntwrk` org:
 After a green run:
 
 ```sh
-npm view @midnight-ntwrk/midnight-verifiable-credential-digital-passport --json
-npm view @midnight-ntwrk/midnight-verifiable-credential-digital-passport dist-tags
-npm view @midnight-ntwrk/midnight-verifiable-credential-digital-passport@0.1.0-rc1 dist.attestations
+npm view @midnight-ntwrk/midnight-vc-passport --json
+npm view @midnight-ntwrk/midnight-vc-passport dist-tags
+npm view @midnight-ntwrk/midnight-vc-passport@0.1.0-rc1 dist.attestations
 ```
 
 Confirm:
@@ -167,7 +167,7 @@ Confirm:
 - the release-evidence artifact (tarballs, SBOMs, dist-tag snapshot) is
   attached to the workflow run,
 - a clean install works from the registry:
-  `npm install @midnight-ntwrk/midnight-verifiable-credential-digital-passport@0.1.0-rc1`
+  `npm install @midnight-ntwrk/midnight-vc-passport@0.1.0-rc1`
   (the workflow already ran this check from the registry).
 
 Finally, record the release: add the install instructions with the live
@@ -186,7 +186,7 @@ version in the package and root changelogs.
 - **Drifted dist-tag:** the pipeline **cannot repair dist-tags** (trusted
   publishing authorizes publication only) — a drift fails the run. Escalate
   to an npm organization owner (`@midnightntwrk/mn-sre`) to repair manually:
-  `npm dist-tag add @midnight-ntwrk/midnight-verifiable-credential-digital-passport@<version> <tag>`,
+  `npm dist-tag add @midnight-ntwrk/midnight-vc-passport@<version> <tag>`,
   then re-dispatch (which verifies the repair as a no-op). Never repair a tag
   onto a version the pipeline did not publish and verify.
 - **A bad version is live:** npm versions are immutable. Within 72 hours of

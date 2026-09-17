@@ -31,7 +31,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '../../..'); // packages/smoke-consumer/scripts -> repo root
-const FAMILY = '@midnight-ntwrk/midnight-verifiable-credential-digital-passport';
+const FAMILY = '@midnight-ntwrk/midnight-vc-passport';
 const NETWORK_ID = '@midnight-ntwrk/midnight-js-network-id';
 
 function run(cmd, args, options = {}) {

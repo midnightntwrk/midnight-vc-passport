@@ -10,8 +10,8 @@
 ## 1. System under discussion
 
 The npm package
-`@midnight-ntwrk/midnight-verifiable-credential-digital-passport`
-(`packages/midnight-verifiable-credential-digital-passport/`) implements the
+`@midnight-ntwrk/midnight-vc-passport`
+(`packages/midnight-vc-passport/`) implements the
 **digital-passport verifiable-credential family**: five committed identity
 claims, selective disclosure, an age-over-threshold zero-knowledge predicate,
 presentation requests, and the issuance/presentation protocol messages, as

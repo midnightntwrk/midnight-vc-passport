@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - The npmjs release train for
-  `@midnight-ntwrk/midnight-verifiable-credential-digital-passport`, ported
+  `@midnight-ntwrk/midnight-vc-passport`, ported
   from the `midnight-verifiable-credentials` publication model and reduced to
   this single-package repository (change `add-npm-release-pipeline`):
   - **`publish.yml`**: a dispatch-only publication workflow (`channel`
@@ -104,6 +104,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `SECURITY.md` is `@midnightntwrk/mn-security`'s decision).
 
 ### Changed
+
+- Renamed the publishable package to
+  **`@midnight-ntwrk/midnight-vc-passport`** (was
+  `@midnight-ntwrk/midnight-verifiable-credential-digital-passport`) and its
+  workspace directory to `packages/midnight-vc-passport`. Nothing was ever
+  published to npm under the old name, so there is no deprecation cycle; the
+  npmjs Trusted Publisher mapping prerequisite now names the new package.
+  The GitHub repository, root workspace name, SPDX headers, and on-chain
+  identifiers (`midnight:vc:digital-passport`, `digital-passport:v1`) are
+  unchanged (change `rename-npm-package`, issue #47).
 
 - Pinned the Compact toolchain at **0.31.1** (was 0.30.0), matching the
   `midnight-did` (#409) and `midnight-verifiable-credentials` (#432)

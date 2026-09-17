@@ -1,5 +1,5 @@
 {
-  "name": "@midnight-ntwrk/midnight-verifiable-credential-digital-passport",
+  "name": "@midnight-ntwrk/midnight-vc-passport",
   "version": "0.1.0",
   "license": "Apache-2.0",
   "description": "Digital-passport verifiable credential family for Midnight: committed claims, selective disclosure, an age-over-threshold predicate, presentation requests, validation circuits, and the protocol model, published as an installable npm package.",
@@ -18,7 +18,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/midnightntwrk/midnight-verifiable-credential-digital-passport.git",
-    "directory": "packages/midnight-verifiable-credential-digital-passport"
+    "directory": "packages/midnight-vc-passport"
   },
   "publishConfig": {
     "access": "public",

@@ -1,4 +1,4 @@
-# @midnight-ntwrk/midnight-verifiable-credential-digital-passport
+# @midnight-ntwrk/midnight-vc-passport
 
 > Maturity: `reference`
 > Package class: `dist`
@@ -37,7 +37,7 @@ Surface classification:
 - generated/runtime TypeScript exports are off-chain mirrors only
 - `./testing` is an `Off-chain only` fixture surface for integration tests
 - example:
-  `import { createDigitalPassportFixtureForParticipants } from "@midnight-ntwrk/midnight-verifiable-credential-digital-passport/testing";`
+  `import { createDigitalPassportFixtureForParticipants } from "@midnight-ntwrk/midnight-vc-passport/testing";`
 
 ## Purpose
 
@@ -234,8 +234,8 @@ pnpm build       # compact compile + tsc -b + stage dist
 pnpm test        # vitest run
 
 # or, scoped to this package
-pnpm --filter @midnight-ntwrk/midnight-verifiable-credential-digital-passport build
-pnpm --filter @midnight-ntwrk/midnight-verifiable-credential-digital-passport test
+pnpm --filter @midnight-ntwrk/midnight-vc-passport build
+pnpm --filter @midnight-ntwrk/midnight-vc-passport test
 ```
 
 The core compact contract is consumed through the published
@@ -251,7 +251,7 @@ The publishable tarball can be produced two ways, and both run the same
 copies):
 
 ```sh
-pnpm --filter @midnight-ntwrk/midnight-verifiable-credential-digital-passport pack
+pnpm --filter @midnight-ntwrk/midnight-vc-passport pack
 nix build .#npm-artifacts   # hermetic: offline deps, pinned toolchain, flake-supplied circuit params
 ```
 

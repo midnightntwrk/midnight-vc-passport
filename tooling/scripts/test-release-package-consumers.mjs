@@ -45,7 +45,7 @@ const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../..",
 );
-const FAMILY = "@midnight-ntwrk/midnight-verifiable-credential-digital-passport";
+const FAMILY = "@midnight-ntwrk/midnight-vc-passport";
 const NETWORK_ID = "@midnight-ntwrk/midnight-js-network-id";
 
 const SEMVER = /^\d+\.\d+\.\d+(-[\w.-]+)?$/u;
