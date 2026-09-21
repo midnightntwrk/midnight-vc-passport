@@ -6,9 +6,9 @@
   "type": "module",
   "engines": {
     "node": ">=24",
-    "pnpm": ">=10"
+    "pnpm": ">=10.34.5"
   },
-  "packageManager": "pnpm@10.34.1",
+  "packageManager": "pnpm@10.34.5",
   "scripts": {
     "clean": "turbo run clean",
     "check:security-workflows": "node ./tooling/scripts/check-security-workflows.mjs",
