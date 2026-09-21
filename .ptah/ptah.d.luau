@@ -1,3 +1,4 @@
+-- ptah 0.1.0 type definitions
 --!strict
 -- @meta
 --
@@ -59,7 +60,8 @@ export type McpServerHttp = {
 export type McpServer = McpServerStdio | McpServerHttp
 
 -- Options for `agent:session(…)`. All fields optional; `id` defaults to
--- `s1, s2, …` per agent, `cwd` to the invocation directory. `resultSchema`
+-- `s1, s2, …` per agent, and `cwd` to the agent's own `cwd` (inline spec or
+-- registry entry), else the invocation directory. `resultSchema`
 -- is a JSON Schema expressed as a plain Luau table: when set, the session
 -- gets a typed-result contract — prompts carry a submit-tool instruction
 -- and the outcome's `result` field carries the accepted submission.
@@ -104,6 +106,7 @@ export type AgentSpec = {
 	command: string,
 	args: { string }?,
 	env: { [string]: string }?,
+	cwd: string?,
 }
 
 -- Options for `ptah.parallel(items, fn, …)`.
@@ -125,6 +128,27 @@ export type ExecResult = {
 	exitCode: number,
 	stdout: string,
 	stderr: string,
+}
+
+-- Options for `ptah.ask(…)`: the question to show (required) plus
+-- optional context rendered as one indented line under the prompt.
+-- v1 has no other options (no timeout: an ask blocks until answered,
+-- aborted, or the run is cancelled).
+export type AskOptions = {
+	prompt: string,
+	details: string?,
+}
+
+-- Result of `ptah.ask(opts)`: a discriminated union — narrow on
+-- `action` (bind the result to a local first). `respond` carries the
+-- answer as received, unprocessed (one line); `abort` is a normal
+-- result the workflow handles like any other value, not an error, and
+-- carries no `text`.
+export type AskResult = {
+	action: "respond",
+	text: string,
+} | {
+	action: "abort",
 }
 
 -- Pure JSON module (`ptah.json`): turns captured command output into
@@ -158,11 +182,15 @@ export type Agent = {
 }
 
 -- One live agent session (own subprocess). `label` is a method, not a
--- property: call it as `session:label()`.
+-- property: call it as `session:label()`. `sessionId` is the agent-side
+-- ACP session id (assigned by the agent at session creation, meaningful
+-- to the agent's own tooling) — distinct from `label`, the ptah-local
+-- attribution id.
 export type Session = {
 	prompt: (self: Session, text: string, opts: PromptOptions?) -> PromptResult,
 	cancel: (self: Session) -> (),
 	label: (self: Session) -> string,
+	sessionId: (self: Session) -> string,
 	close: (self: Session) -> (),
 	configOptions: (self: Session) -> { ConfigOption },
 	setConfig: (self: Session, id: string, value: string | boolean) -> (),
@@ -178,6 +206,7 @@ declare ptah: {
 	join: <T>(tasks: { Task<T> }) -> { Outcome<T> },
 	parallel: <T, U>(items: { T }, fn: (item: T) -> U, opts: ParallelOptions?) -> { Outcome<U> },
 	exec: (cmd: string, opts: ExecOptions?) -> ExecResult,
+	ask: (opts: AskOptions) -> AskResult,
 	json: Json,
 	sleep: (ms: number) -> (),
 	log: (msg: string) -> (),
@@ -202,6 +231,7 @@ declare os: {
 		isdst: boolean?,
 	}?) -> number,
 	clock: () -> number,
+	getenv: (name: string) -> string?,
 }
 
 declare coroutine: {
