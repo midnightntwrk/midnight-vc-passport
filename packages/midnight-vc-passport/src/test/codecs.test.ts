@@ -60,7 +60,7 @@ import { JUBJUB_SUBGROUP_ORDER, mod } from '../testing/jubjub-utils.js';
 /** Create a random VerificationMethodRef for testing. */
 function randomVerificationMethodRef() {
   return {
-    didContractAddress: { bytes: crypto.randomBytes(32) },
+    controllerAddress: { bytes: crypto.randomBytes(32) },
     methodId: crypto.randomBytes(32),
   };
 }
@@ -68,7 +68,7 @@ function randomVerificationMethodRef() {
 /** Use fixed-width public references when testing encoded-size stability. */
 function fixedVerificationMethodRef() {
   return {
-    didContractAddress: { bytes: Buffer.alloc(32, 0x11) },
+    controllerAddress: { bytes: Buffer.alloc(32, 0x11) },
     methodId: Buffer.alloc(32, 0x22),
   };
 }
@@ -211,16 +211,16 @@ describe('digitalPassportCredentialDescriptor', () => {
     expect(decoded.schema.majorVersion).toBe(credential.schema.majorVersion);
     expect(decoded.schema.minorVersion).toBe(credential.schema.minorVersion);
     // VerificationMethodRef fields contain nested Uint8Arrays — compare byte-by-byte
-    expect(new Uint8Array(decoded.issuerVerificationMethodRef.didContractAddress.bytes)).toEqual(
-      new Uint8Array(credential.issuerVerificationMethodRef.didContractAddress.bytes),
+    expect(new Uint8Array(decoded.issuerVerificationMethodRef.controllerAddress.bytes)).toEqual(
+      new Uint8Array(credential.issuerVerificationMethodRef.controllerAddress.bytes),
     );
     expect(new Uint8Array(decoded.issuerVerificationMethodRef.methodId)).toEqual(
       new Uint8Array(credential.issuerVerificationMethodRef.methodId),
     );
     expect(
-      new Uint8Array(decoded.holderBinding.holderVerificationMethodRef.didContractAddress.bytes),
+      new Uint8Array(decoded.holderBinding.holderVerificationMethodRef.controllerAddress.bytes),
     ).toEqual(
-      new Uint8Array(credential.holderBinding.holderVerificationMethodRef.didContractAddress.bytes),
+      new Uint8Array(credential.holderBinding.holderVerificationMethodRef.controllerAddress.bytes),
     );
     expect(new Uint8Array(decoded.holderBinding.holderVerificationMethodRef.methodId)).toEqual(
       new Uint8Array(credential.holderBinding.holderVerificationMethodRef.methodId),
@@ -367,8 +367,8 @@ describe('digitalPassportProofDescriptor', () => {
     const decoded = decodeDigitalPassportProof(encoded);
 
     // Byte-by-byte comparison for Uint8Array fields (Buffer vs Uint8Array)
-    expect(new Uint8Array(decoded.signerVerificationMethodRef.didContractAddress.bytes)).toEqual(
-      new Uint8Array(credentialProof.signerVerificationMethodRef.didContractAddress.bytes),
+    expect(new Uint8Array(decoded.signerVerificationMethodRef.controllerAddress.bytes)).toEqual(
+      new Uint8Array(credentialProof.signerVerificationMethodRef.controllerAddress.bytes),
     );
     expect(new Uint8Array(decoded.signerVerificationMethodRef.methodId)).toEqual(
       new Uint8Array(credentialProof.signerVerificationMethodRef.methodId),
@@ -476,9 +476,9 @@ describe('Joint credential + proof encoding', () => {
 //   34      32    schema.schemaId (Bytes<32>)
 //   66      2     schema.majorVersion (Uint16)
 //   68      2     schema.minorVersion (Uint16)
-//   70      32    issuerVerificationMethodRef.didContractAddress.bytes (Bytes<32>)
+//   70      32    issuerVerificationMethodRef.controllerAddress.bytes (Bytes<32>)
 //   102     32    issuerVerificationMethodRef.methodId (Bytes<32>)
-//   134     32    holderBinding.holderVerificationMethodRef.didContractAddress.bytes
+//   134     32    holderBinding.holderVerificationMethodRef.controllerAddress.bytes
 //   166     32    holderBinding.holderVerificationMethodRef.methodId
 //   —       0     statusBinding (NoStatusBinding, zero-sized)
 //   198     ~4-8  issuedAt (Uint64, variable-length)
@@ -601,7 +601,7 @@ describe('Byte-layout regression guard', () => {
     // - Uint64 fields (issuedAt, expiresAt) use variable-length encoding
     //   (~4 bytes each for current-era timestamps, up to 8 bytes for max values)
     // - Bytes32 fields contribute 32 bytes each (9 fields: packageId, schemaId,
-    //   didContractAddress×2, methodId×2, claimCommitments×5, claimRoot)
+    //   controllerAddress×2, methodId×2, claimCommitments×5, claimRoot)
     // - Boolean field (hasExpiration) contributes 1 byte
     // - NoStatusBinding and NoPublicClaims are zero-sized (0 bytes)
     // - No JubjubPoint or Field fields exist in the credential

@@ -209,7 +209,7 @@ This repository ships a private `packages/smoke-consumer` workspace and CI lane
 that packs the built tarball, installs it into a clean registry-resolved
 environment, imports every public entry point (`.`, `./codecs`, `./contract`,
 `./testing`), and runs an issuance/presentation fixture round-trip. Because
-`@midnight-ntwrk/credential-compact@0.1.0-rc3` and `@midnight-ntwrk/compact-runtime@0.16.0`
+`@midnight-ntwrk/credential-compact@0.2.0-rc1` and `@midnight-ntwrk/compact-runtime@0.16.0`
 are published, the isolated project resolves every dependency from the npm
 registry — a genuine registry-resolution proof. That lane is the boundary proof
 that authorizes deletion of the monorepo prototype, and it runs green on every

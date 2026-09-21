@@ -96,7 +96,9 @@ export pure circuit assertValidDigitalPassportCredential(
                       ): [] {
   assertValidDigitalPassportSchemaRef(credential.schema);
   assertValidCredentialEnvelope(credential, digitalPassportClaimRoot(credential.claimCommitments));
-  assertValidNoStatusBinding(credential.statusBinding);
+  // NOTE: the core dropped its no-op `assertValidNoStatusBinding` validator;
+  // an empty `NoStatusBinding` struct has nothing to validate. `NoStatusBinding`
+  // remains the family's status profile (design D4).
   assertValidExplicitHolderBinding(credential.holderBinding);
   assertValidCredentialProof(credential, proof);
 }
@@ -185,8 +187,8 @@ export pure circuit assertDigitalPassportPresentationSatisfiesRequest(
   assertValidDigitalPassportSchemaRef(presentation.schema);
   assertMatchingSchemaRefs(request.schema, credential.schema);
   assertMatchingSchemaRefs(request.schema, presentation.schema);
-  assert(request.issuerVerificationMethodRef.didContractAddress ==
-         credential.issuerVerificationMethodRef.didContractAddress,
+  assert(request.issuerVerificationMethodRef.controllerAddress ==
+         credential.issuerVerificationMethodRef.controllerAddress,
          "Presentation request issuer contract does not match the credential issuer"
          );
   assert(request.issuerVerificationMethodRef.methodId ==

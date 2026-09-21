@@ -94,7 +94,7 @@
   },
   "dependencies": {
     "@midnight-ntwrk/compact-runtime": "0.16.0",
-    "@midnight-ntwrk/credential-compact": "0.1.0-rc3"
+    "@midnight-ntwrk/credential-compact": "0.2.0-rc1"
   },
   "devDependencies": {
     "@midnight-ntwrk/midnight-js-network-id": "4.1.1",

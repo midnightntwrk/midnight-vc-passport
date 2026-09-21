@@ -21,7 +21,7 @@ import {
   type Proof,
   pureCircuits as genericPureCircuits,
   type VerificationMethodRef,
-} from '@midnight-ntwrk/credential-compact/contract';
+} from '@midnight-ntwrk/credential-compact';
 
 import {
   type CredentialProtocolFeatures,
@@ -106,7 +106,7 @@ const createProtocolEnvelope = ({
   messageId: sha256(`protocol:message:${label}`),
   threadId: sha256(`protocol:thread:${threadLabel}`),
   initialMessage,
-  respondsToMessageId: respondsToMessageId ?? genericPureCircuits.noProtocolResponseReference(),
+  respondsToMessageId: respondsToMessageId ?? pureCircuits.noProtocolResponseReference(),
   createdAt,
   hasExpiresAt: false,
   expiresAt: 0n,
@@ -121,7 +121,7 @@ export const createSigner = (
   secretKey,
   publicKey: ecMulGenerator(secretKey),
   verificationMethodRef: {
-    didContractAddress: contractAddress(label),
+    controllerAddress: contractAddress(label),
     methodId: padText(methodId),
   },
 });

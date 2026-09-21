@@ -18,8 +18,11 @@ presentation requests, and the issuance/presentation protocol messages, as
 Compact `pure circuit`s plus off-chain compact-value codecs.
 
 Runtime dependencies: `@midnight-ntwrk/credential-compact` (the generic
-VC/VP/protocol core, staged into `core-compact-staging/` at build time) and
-`@midnight-ntwrk/compact-runtime`. The package contains no network code and
+VC/VP core — envelope types, proof, and validation primitives; its compact
+sources are staged into `core-compact-staging/` at build time) and
+`@midnight-ntwrk/compact-runtime`. The protocol choreography (message
+envelopes and their alignment circuits) is owned by the family layer, not the
+core. The package contains no network code and
 no key storage. Everything the family layer defines is either a pure circuit
 or a codec; the public root additionally re-exports the compiler-generated
 contract module (`src/contract.ts`) — the `Contract` deployment wrapper, an
@@ -249,7 +252,8 @@ validation (`validation.compact`), proofs (`proofs.compact`).*
 The family pins `HolderBindingProfile.explicitDid` on every protocol
 message that carries a holder-binding profile field — the issuance offer,
 request, and result, and the presentation request and submission
-(`validation.compact`). The presentation `ResultMessage` (`present.compact`)
+(`validation.compact`). The verification `ResultMessage`
+(`protocol-model.compact`)
 carries no holder-binding field; the family's result validation covers the
 protocol envelope and requires a credential root whenever the result is
 approved.

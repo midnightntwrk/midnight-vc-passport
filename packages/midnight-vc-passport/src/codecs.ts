@@ -110,7 +110,7 @@ const schemaRefDescriptor: CompactType<SchemaRef> = {
 /**
  * ContractAddress descriptor — wraps Bytes<32> in a `{ bytes: Uint8Array }` struct.
  *
- * This matches the `didContractAddress` field shape in VerificationMethodRef.
+ * This matches the `controllerAddress` field shape in VerificationMethodRef.
  */
 const contractAddressDescriptor: CompactType<{ bytes: Uint8Array }> = {
   alignment: () => bytes32.alignment(),
@@ -121,17 +121,17 @@ const contractAddressDescriptor: CompactType<{ bytes: Uint8Array }> = {
 /**
  * VerificationMethodRef descriptor — matches the Compact binary layout.
  *
- * Field order: didContractAddress (ContractAddress), methodId (Bytes<32>)
+ * Field order: controllerAddress (ContractAddress), methodId (Bytes<32>)
  */
 const verificationMethodRefDescriptor: CompactType<VerificationMethodRef> = {
   alignment: () => contractAddressDescriptor.alignment().concat(bytes32.alignment()),
   fromValue: (value: Value): VerificationMethodRef => ({
-    didContractAddress: contractAddressDescriptor.fromValue(value),
+    controllerAddress: contractAddressDescriptor.fromValue(value),
     methodId: bytes32.fromValue(value),
   }),
   toValue: (value: VerificationMethodRef): Value =>
     contractAddressDescriptor
-      .toValue(value.didContractAddress)
+      .toValue(value.controllerAddress)
       .concat(bytes32.toValue(value.methodId)),
 };
 

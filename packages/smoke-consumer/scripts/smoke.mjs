@@ -52,6 +52,60 @@ function run(cmd, args, options = {}) {
   return result;
 }
 
+// `pnpm run` injects the workspace's own pnpm settings (including
+// `minimumReleaseAge`) into lifecycle-script environments as `npm_config_*`
+// variables. Those leaked variables are stripped from the child environment:
+// an env var would override the isolated project's own policy, and pnpm
+// cannot carry the exclusion list through the environment. Stripping alone
+// would leave the child install policy-less (disabling the supply-chain
+// release-age floor for every package it resolves from the registry), so the
+// isolated consumer gets the workspace's floor and its reviewed, time-boxed
+// exclusions mirrored into its own pnpm-workspace.yaml (read live from the
+// workspace config in `readReleaseAgePolicy` so the two cannot drift).
+const consumerEnv = Object.fromEntries(
+  Object.entries(process.env).filter(([key]) => !/release.?age/i.test(key)),
+);
+
+// Read the workspace's supply-chain release-age policy (pnpm-workspace.yaml)
+// so the isolated consumer can enforce the identical floor and exclusions.
+// The reads run under `consumerEnv` so leaked npm_config_* variables cannot
+// shadow the file-based values. Fail-closed: without a floor the smoke
+// refuses to install anything.
+function readReleaseAgePolicy() {
+  const get = (key) => {
+    const stdout =
+      run('pnpm', ['config', 'get', key, '--json'], { cwd: repoRoot, env: consumerEnv }).stdout ??
+      '';
+    return stdout.trim() ? JSON.parse(stdout) : undefined;
+  };
+  const minimumReleaseAge = get('minimumReleaseAge');
+  if (!Number.isInteger(minimumReleaseAge) || minimumReleaseAge <= 0) {
+    throw new Error(
+      'smoke: the workspace declares no `minimumReleaseAge` floor; refusing to install without a release-age policy',
+    );
+  }
+  return { minimumReleaseAge, minimumReleaseAgeExclude: get('minimumReleaseAgeExclude') ?? [] };
+}
+
+// Serialize the policy as the isolated project's pnpm-workspace.yaml. Entries
+// are single-quoted (plain YAML scalars may not start with reserved
+// indicators like `@`), using the YAML `''` escape.
+function renderReleaseAgePolicy({ minimumReleaseAge, minimumReleaseAgeExclude }) {
+  const lines = [
+    '# Supply-chain policy mirrored from the repository workspace',
+    '# (pnpm-workspace.yaml): this isolated consumer install enforces the same',
+    '# release-age floor with the same reviewed, time-boxed exclusions.',
+    `minimumReleaseAge: ${minimumReleaseAge}`,
+  ];
+  if (minimumReleaseAgeExclude.length > 0) {
+    lines.push('minimumReleaseAgeExclude:');
+    for (const entry of minimumReleaseAgeExclude) {
+      lines.push(`  - '${String(entry).replaceAll("'", "''")}'`);
+    }
+  }
+  return `${lines.join('\n')}\n`;
+}
+
 const isolated = mkdtempSync(join(tmpdir(), 'dp-smoke-'));
 console.log(`smoke: clean consumer project at ${isolated}`);
 try {
@@ -67,6 +121,13 @@ try {
   }
   const tarballPath = join(isolated, tarball);
   console.log(`smoke: using tarball ${tarballPath}`);
+
+  // The isolated project enforces the repository's own release-age policy
+  // (see `readReleaseAgePolicy`); write it before any install runs.
+  writeFileSync(
+    join(isolated, 'pnpm-workspace.yaml'),
+    renderReleaseAgePolicy(readReleaseAgePolicy()),
+  );
 
   writeFileSync(
     join(isolated, 'package.json'),
@@ -86,7 +147,7 @@ try {
   );
 
   console.log('smoke: installing the family tarball with registry-only transitive resolution');
-  run('pnpm', ['add', tarballPath, NETWORK_ID], { cwd: isolated });
+  run('pnpm', ['add', tarballPath, NETWORK_ID], { cwd: isolated, env: consumerEnv });
 
   cpSync(join(here, 'round-trip.mjs'), join(isolated, 'round-trip.mjs'));
   console.log('smoke: running the issuance/presentation/verification round-trip');

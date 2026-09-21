@@ -69,8 +69,8 @@ importers:
         specifier: 0.16.0
         version: 0.16.0
       '@midnight-ntwrk/credential-compact':
-        specifier: 0.1.0-rc3
-        version: 0.1.0-rc3
+        specifier: 0.2.0-rc1
+        version: 0.2.0-rc1
     devDependencies:
       '@midnight-ntwrk/midnight-js-network-id':
         specifier: 4.1.1
@@ -337,15 +337,12 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@midnight-ntwrk/compact-runtime@0.15.0':
-    resolution: {integrity: sha512-6+odrxb83ZZwF29SqNBBgaOR3hf5ej4KZVGibDwdXta9+uiv6qYW0fMrsKP9S+c2AqvY+vEb5NEFFI54lA7G5A==}
-
   '@midnight-ntwrk/compact-runtime@0.16.0':
     resolution: {integrity: sha512-UR8+MI5zol+gkne17ZZru8xmZNf11xMgQJkiLT9KWsF+QD8Wuz1WONaqQLL0RAZ2aN2XlRsBFd0ViKDVh8prFw==}
 
-  '@midnight-ntwrk/credential-compact@0.1.0-rc3':
-    resolution: {integrity: sha512-5hq9/3A9dj5dpL23D8+vuc/IyaNB51xWzmosT9uon6IhuZ3oGO8jDoG85WibqjRRfFpGo0PK+5dYiEu39qh/HA==}
-    engines: {node: '>=24', pnpm: '>=10'}
+  '@midnight-ntwrk/credential-compact@0.2.0-rc1':
+    resolution: {integrity: sha512-jmlJev8Q+EJj/P8zx0ID8fnS7tg+7stAl+ineYAZOKxy8ZTCez7bTyKP5DxqN5VisFTRmSb0IKQ4nb8kAiSV0Q==}
+    engines: {node: '>=24', pnpm: '>=10.34.5'}
 
   '@midnight-ntwrk/midnight-js-network-id@4.1.1':
     resolution: {integrity: sha512-g49IBK0In1Jt2wKgi18rUvoy1ShGVrfb/VvgWALkc9Noc6+4MX5NTLVg5zqu+CyO2waIGb5lqDPnAhTD9wPAOQ==}
@@ -2063,21 +2060,15 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@midnight-ntwrk/compact-runtime@0.15.0':
-    dependencies:
-      '@midnight-ntwrk/onchain-runtime-v3': 3.1.0
-      '@types/object-inspect': 1.13.0
-      object-inspect: 1.13.4
-
   '@midnight-ntwrk/compact-runtime@0.16.0':
     dependencies:
       '@midnight-ntwrk/onchain-runtime-v3': 3.1.0
       '@types/object-inspect': 1.13.0
       object-inspect: 1.13.4
 
-  '@midnight-ntwrk/credential-compact@0.1.0-rc3':
+  '@midnight-ntwrk/credential-compact@0.2.0-rc1':
     dependencies:
-      '@midnight-ntwrk/compact-runtime': 0.15.0
+      '@midnight-ntwrk/compact-runtime': 0.16.0
 
   '@midnight-ntwrk/midnight-js-network-id@4.1.1': {}
 

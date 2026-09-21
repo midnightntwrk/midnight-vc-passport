@@ -103,8 +103,10 @@ helper scripts, no managed source maps, version consistency). Adding a new
 publishable package under `packages/` flows into this output automatically.
 
 > **Published-core note:** the family's core contract dependency
-> `@midnight-ntwrk/credential-compact@0.1.0-rc3` is published to npm alongside
-> `@midnight-ntwrk/compact-runtime@0.16.0`. The manifest is strictly
+> `@midnight-ntwrk/credential-compact@0.2.0-rc1` is published to npm and is
+> built against the same `@midnight-ntwrk/compact-runtime@0.16.0` the family
+> pins, so the dependency graph resolves a single shared runtime instance for
+> both packages. The manifest is strictly
 > registry-clean — dependencies resolve from the registry with no `.core-rc/`
 > and no `file:` override anywhere. The workspace carries exactly one
 > advisory-driven override (`nanoid@3.3.18`, GHSA-2v37-7h3g-55p8) in the
