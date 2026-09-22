@@ -1,0 +1,45 @@
+packages:
+  - "packages/*"
+
+# Supply-chain hardening (matches midnight-did):
+# - block exotic-URL subdependencies (git/tarball/http resolvers in the graph)
+# - minimum release age of 10080 minutes (7 days) before a version is installable
+# - no-downgrade trust policy for registry attestations
+# Exemptions must be listed explicitly below so every one is a reviewable diff.
+blockExoticSubdeps: true
+minimumReleaseAge: 10080
+trustPolicy: no-downgrade
+minimumReleaseAgeExclude:
+  [
+    # Renovate security update: pnpm@10.34.5
+    pnpm@10.34.5,
+    # Reviewed, time-boxed exemption for the openspec change
+    # `upgrade-credential-compact`: the dependency bump to 0.2.0-rc1 was
+    # explicitly scheduled past the 7-day window (installs allowed from
+    # 2026-09-25), and the change loop was authorized to proceed early.
+    # The entry is inert once the version is older than the window and can
+    # be dropped in a follow-up cleanup after 2026-09-25. The smoke-consumer's
+    # isolated install mirrors this exact policy into its own config rather
+    # than bypassing it.
+    '@midnight-ntwrk/credential-compact@0.2.0-rc1'
+  ]
+trustPolicyExclude: []
+
+# Advisory-driven transitive override: GHSA-2v37-7h3g-55p8 (high) is patched in
+# nanoid 3.3.18, but the lockfile had pinned 3.3.17 (resolved while 3.3.18 was
+# still inside the minimumReleaseAge window) and pnpm update no-ops on an
+# already-satisfying lockfile. 3.3.18 carries npm provenance attestations like
+# 3.3.17. Dev-tooling scope only (postcss/vite chain); the publishable
+# manifest's registry-clean dependency policy is unaffected.
+overrides:
+  nanoid: 3.3.18
+  # Advisory-driven transitive override: GHSA-2883-xcg3-v3hh (high) is patched
+  # in js-yaml 4.3.2; the lockfile had resolved 4.3.1 (via eslint/espree).
+  # 4.3.2 carries npm provenance attestations. Dev-tooling scope only.
+  js-yaml@<4.3.2: 4.3.2
+
+# Declared (reviewed) build-script allowances: pnpm skips the install scripts
+# of these otherwise-silent dependencies instead of executing them.
+ignoredBuiltDependencies:
+  - esbuild
+  - unrs-resolver

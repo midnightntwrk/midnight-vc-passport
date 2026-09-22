@@ -1,0 +1,13 @@
+# The human-in-the-loop provider for ptah.ask (openspec and PR-review
+# escalations): render prompts on stdout and read answers from stdin.
+[ask]
+provider = "stdin"
+
+[agents.pi]
+command = "pi-acp"
+args = [ ]
+env = { PI_NO_BELL = "1" }
+
+[agents.opencode]
+command = "opencode"
+args = ["acp"]
