@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   scan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -24,7 +24,12 @@ jobs:
       statuses: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  #v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Scan code
-        uses: midnightntwrk/upload-sarif-github-action@362d0346b194663004cb371e8e8523bd1c910917
+        uses: midnightntwrk/upload-sarif-github-action@e90808cc2a4bde5b3f14b1df426c2f142bc59a37 # includes caller-workspace scan fix
+        with:
+          fail_severity: "high"
+          skip_scorecard_scan: "true"

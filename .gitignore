@@ -1,0 +1,80 @@
+# Node.js
+node_modules/
+dist/
+**/dist/
+build/
+target/
+**/target/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs
+logs
+*.log
+logs/*.log
+coverage/
+
+# Test reports
+**/reports
+
+# Dependency directories
+.pnpm-store
+
+# Optional local npm cache used by packaging scripts
+.npm-cache
+
+# Turbo
+.turbo/
+
+# Optional eslint cache
+.eslintcache
+
+# Output of 'npm pack'
+*.tgz
+
+# Release pipeline artifacts (packed tarballs, SBOMs, dist-tag state)
+tooling/artifacts/
+
+# dotenv environment variables file
+.env
+.env.local
+.env.*.local
+
+# Local app state and secrets
+.midnight-did/
+.midnight-test/
+
+# MacOS
+.DS_Store
+
+# IDEs and editors
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Compact generated managed code
+managed/
+**/managed/
+
+# Staged core compact sources (build artifact; see scripts/stage-core-compact.mjs)
+core-compact-staging/
+**/core-compact-staging/
+
+# PI workspace
+.pi/*
+!.pi/settings.json
+
+# Nix build outputs
+result
+result-*
+
+# Local pre-RC core build used only while @midnight-ntwrk/midnight-did-credentials
+# is unpublished (change extract-digital-passport-credential, gate 1.1). Removed
+# when the RC publishes and the smoke lane (group 6) goes green.
+/.core-rc/

@@ -1,0 +1,28 @@
+# Build output
+dist/
+build/
+target/
+
+# Generated managed compact code
+src/managed/
+**/managed/
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Tooling caches
+.turbo/
+.eslintcache
+*.tsbuildinfo
+
+# Coverage / reports
+coverage/
+**/reports
+
+# Packed tarballs
+*.tgz
+
+# Nix
+result
+result-*

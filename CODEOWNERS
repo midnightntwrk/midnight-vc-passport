@@ -2,7 +2,23 @@
 /.github/ISSUE_TEMPLATE/ @midnightntwrk/mn-security @midnightntwrk/mn-sre
 /.github/PULL_REQUEST_TEMPLATE/ @midnightntwrk/mn-security @midnightntwrk/mn-sre
 /.github/workflows/scan.yaml @midnightntwrk/mn-security @midnightntwrk/mn-sre
-/.github/workflows/dependabot.yml @midnightntwrk/mn-security @midnightntwrk/mn-sre
+/.github/workflows/scorecard.yml @midnightntwrk/mn-security @midnightntwrk/mn-sre
+/.github/workflows/dependency-review.yml @midnightntwrk/mn-security @midnightntwrk/mn-sre
+/.github/dependabot.yml @midnightntwrk/mn-security @midnightntwrk/mn-sre
+
+# Release surface (npmjs publication pipeline; see docs/guides/npmjs-publication.md)
+/.github/workflows/publish.yml @midnightntwrk/ex-identus @midnightntwrk/mn-security @midnightntwrk/mn-sre
+/tooling/scripts/workspace-catalog.mjs @midnightntwrk/ex-identus @midnightntwrk/mn-security @midnightntwrk/mn-sre
+/tooling/scripts/prepare-release-version.mjs @midnightntwrk/ex-identus @midnightntwrk/mn-security @midnightntwrk/mn-sre
+/tooling/scripts/release-resolve-context.sh @midnightntwrk/ex-identus @midnightntwrk/mn-security @midnightntwrk/mn-sre
+/tooling/scripts/pack-artifacts.sh @midnightntwrk/ex-identus @midnightntwrk/mn-security @midnightntwrk/mn-sre
+/tooling/scripts/check-release-package-contract.mjs @midnightntwrk/ex-identus @midnightntwrk/mn-security @midnightntwrk/mn-sre
+/tooling/scripts/test-release-package-consumers.mjs @midnightntwrk/ex-identus @midnightntwrk/mn-security @midnightntwrk/mn-sre
+/tooling/scripts/publish-npm-packages.sh @midnightntwrk/ex-identus @midnightntwrk/mn-security @midnightntwrk/mn-sre
+/tooling/scripts/wait-for-npm-packages.mjs @midnightntwrk/ex-identus @midnightntwrk/mn-security @midnightntwrk/mn-sre
+/tooling/scripts/npm-release-state.mjs @midnightntwrk/ex-identus @midnightntwrk/mn-security @midnightntwrk/mn-sre
+/tooling/scripts/generate-release-sbom.mjs @midnightntwrk/ex-identus @midnightntwrk/mn-security @midnightntwrk/mn-sre
+/docs/guides/npmjs-publication.md @midnightntwrk/ex-identus @midnightntwrk/mn-security @midnightntwrk/mn-sre
 CODE_OF_CONDUCT.md @midnightntwrk/mn-security @midnightntwrk/mn-sre
 CODEOWNERS @midnightntwrk/mn-security @midnightntwrk/mn-sre
 CONTRIBUTING.md @midnightntwrk/mn-security @midnightntwrk/mn-sre
