@@ -1,0 +1,14 @@
+# OSV Scanner configuration.
+#
+# Intentionally empty: no vulnerabilities are currently ignored.
+#
+# Every future IgnoredVulns entry must carry:
+#   - id          the advisory identifier (e.g. GHSA-....)
+#   - ignoreUntil the expiry date (YYYY-MM-DD); expired entries fail CI
+#   - reason      a short justification linking to the matching
+#                 `## <ADVISORY-ID>` section in
+#                 docs/security/vulnerability-exceptions.md
+#
+# The CI check `check:vulnerability-exceptions`
+# (tooling/scripts/check-vulnerability-exceptions.mjs) fails when an entry is
+# undocumented, unowned, expired, or disagrees with the documentation.
