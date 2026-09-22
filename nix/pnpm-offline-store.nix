@@ -26,7 +26,7 @@ stdenv.mkDerivation {
 
   outputHashMode = "recursive";
   outputHashAlgo = "sha256";
-  outputHash = "sha256-faZ38YuBbXTnr6ldvY1K3ynmzorsC1vHb4C1QE/auHQ=";
+  outputHash = "sha256-7QRtvR6I9IBP4UdlXFo8DpkggLpPXl76hxEE58kYVQU=";
 
   dontUnpack = true;
   dontConfigure = true;

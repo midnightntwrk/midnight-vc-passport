@@ -26,17 +26,30 @@
 //   - no managed-code source maps, no secret material
 //   - tarball filename version == packed manifest version
 //
+// Additionally emits a machine-readable report (github-release-distribution:
+// "Release assets and integrity evidence") at tooling/artifacts/contract-report.json
+// — per-tarball check results plus the resolved version, deterministic content
+// (no timestamps) — without changing the exit semantics. The default path sits
+// inside tooling/artifacts/ so the unchanged evidence-artifact upload globs it,
+// and the GitHub-Release bridge attaches it to the release as an asset.
+//
 // CLI:
-//   check-release-package-contract.mjs [--artifacts-dir <dir>]
-//   check-release-package-contract.mjs --tarball <file> ...
+//   check-release-package-contract.mjs [--artifacts-dir <dir>] [--report <file>]
+//   check-release-package-contract.mjs --tarball <file> ... [--report <file>]
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { publishableWorkspaces } from "./workspace-catalog.mjs";
+
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
+const DEFAULT_REPORT_PATH = path.join(repoRoot, "tooling", "artifacts", "contract-report.json");
 
 const NPM_PUBLIC_REGISTRY = "https://registry.npmjs.org/";
 const REPOSITORY_URL =
@@ -175,7 +188,7 @@ export const contractViolations = (packageRoot, { expectedRepositoryDirectory } 
 
 const checkTarball = (tarball) => {
   if (!existsSync(tarball) || !statSync(tarball).isFile()) {
-    return [{ tarball, violations: [`tarball not found: ${tarball}`] }];
+    return [{ tarball, version: null, violations: [`tarball not found: ${tarball}`] }];
   }
   const work = mkdtempSync(path.join(tmpdir(), "release-contract-"));
   try {
@@ -201,10 +214,38 @@ const checkTarball = (tarball) => {
         `tarball filename '${filename}' does not match the packed manifest version '${manifest.version}'`,
       );
     }
-    return [{ tarball: filename, violations }];
+    return [{ tarball: filename, version: manifest.version, violations }];
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
+};
+
+/**
+ * Writes the machine-readable contract report. Deterministic by construction:
+ * per-tarball results sorted by filename, the resolved version, and nothing
+ * time-dependent. Returns the report document.
+ */
+export const writeContractReport = (reportPath, results) => {
+  const sorted = [...results].sort((a, b) => (a.tarball < b.tarball ? -1 : a.tarball > b.tarball ? 1 : 0));
+  const versions = sorted
+    .map((result) => result.version)
+    .filter((version) => typeof version === "string");
+  const resolvedVersion =
+    versions.length > 0 && versions.every((version) => version === versions[0])
+      ? versions[0]
+      : null;
+  const report = {
+    result: sorted.every((result) => result.violations.length === 0) ? "pass" : "fail",
+    version: resolvedVersion,
+    tarballs: sorted.map((result) => ({
+      tarball: result.tarball,
+      passed: result.violations.length === 0,
+      violations: result.violations,
+    })),
+  };
+  mkdirSync(path.dirname(reportPath), { recursive: true });
+  writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  return report;
 };
 
 const isMain =
@@ -214,17 +255,28 @@ const isMain =
 if (isMain) {
   const args = process.argv.slice(2);
   let artifactsDir = null;
+  let reportPathArg = null;
+  let tarballMode = false;
   let tarballs = [];
   for (let index = 0; index < args.length; index += 1) {
     if (args[index] === "--artifacts-dir") {
       artifactsDir = args[++index];
     } else if (args[index] === "--tarball") {
       tarballs.push(args[++index]);
+      tarballMode = true;
+    } else if (args[index] === "--report") {
+      reportPathArg = args[++index];
     } else {
       console.error(`[check-release-package-contract] unknown argument ${args[index]}`);
       process.exit(2);
     }
   }
+  // The report is release evidence: it is emitted for the artifacts-dir
+  // (release) path — always inside tooling/artifacts/, the path the
+  // evidence-artifact upload globs and the GitHub-Release bridge attaches —
+  // or wherever --report names. Ad-hoc --tarball checks stay side-effect-
+  // free unless --report is explicit.
+  const reportPath = reportPathArg ?? (tarballMode ? null : DEFAULT_REPORT_PATH);
 
   if (tarballs.length === 0) {
     const dir =
@@ -238,7 +290,8 @@ if (isMain) {
     }
     tarballs = readdirSync(dir)
       .filter((file) => file.endsWith(".tgz"))
-      .map((file) => path.join(dir, file));
+      .map((file) => path.join(dir, file))
+      .sort();
   }
 
   if (tarballs.length === 0) {
@@ -247,6 +300,10 @@ if (isMain) {
   }
 
   const results = tarballs.flatMap((tarball) => checkTarball(tarball));
+  // The report is emitted on both the pass and the failure path (before the
+  // exit decision) — the release attaches it either way, and emission never
+  // changes the exit semantics.
+  const report = reportPath ? writeContractReport(reportPath, results) : null;
   const failed = results.filter((result) => result.violations.length > 0);
   if (failed.length > 0) {
     for (const result of failed) {
@@ -261,4 +318,7 @@ if (isMain) {
     console.log(`[check-release-package-contract] ${result.tarball}: contract satisfied`);
   }
   console.log(`Release package contract satisfied for ${results.length} tarball(s).`);
+  if (report) {
+    console.log(`[check-release-package-contract] report written to ${path.resolve(reportPath)} (result: ${report.result}, version: ${report.version ?? "<unresolved>"})`);
+  }
 }

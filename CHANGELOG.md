@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- First bridge release: **`v0.1.0-rc1`** dispatched on `develop` (channel
+  `rc`, [run 33615405618](https://github.com/midnightntwrk/midnight-verifiable-credential-digital-passport/actions/runs/33615405618))
+  through the temporary GitHub-Release distribution bridge pending the npmjs
+  automation token. The prerelease (never latest) carries the
+  contract-checked tarball, `SHA256SUMS`, the SPDX SBOM, the package-contract
+  report, and build-provenance attestations for every asset; the release-URL
+  consumer round-trip passed and every attestation verified via
+  `gh attestation verify`. Consumers install by the versioned release URL
+  (see the READMEs); the dispatch procedure and the bridge exit condition
+  live in the [publication runbook](docs/guides/npmjs-publication.md).
+
 ### Security
 
 - Pinned the transitive `nanoid` to **3.3.18** via a single workspace
@@ -21,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - The npmjs release train for
-  `@midnight-ntwrk/midnight-verifiable-credential-digital-passport`, ported
+  `@midnight-ntwrk/midnight-vc-passport`, ported
   from the `midnight-verifiable-credentials` publication model and reduced to
   this single-package repository (change `add-npm-release-pipeline`):
   - **`publish.yml`**: a dispatch-only publication workflow (`channel`
@@ -91,6 +104,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `SECURITY.md` is `@midnightntwrk/mn-security`'s decision).
 
 ### Changed
+
+- Renamed the publishable package to
+  **`@midnight-ntwrk/midnight-vc-passport`** (was
+  `@midnight-ntwrk/midnight-verifiable-credential-digital-passport`) and its
+  workspace directory to `packages/midnight-vc-passport`. Nothing was ever
+  published to npm under the old name, so there is no deprecation cycle; the
+  npmjs Trusted Publisher mapping prerequisite now names the new package.
+  The GitHub repository, root workspace name, SPDX headers, and on-chain
+  identifiers (`midnight:vc:digital-passport`, `digital-passport:v1`) are
+  unchanged (change `rename-npm-package`, issue #47).
 
 - Pinned the Compact toolchain at **0.31.1** (was 0.30.0), matching the
   `midnight-did` (#409) and `midnight-verifiable-credentials` (#432)

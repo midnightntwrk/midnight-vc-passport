@@ -40,8 +40,8 @@ const repoRoot = path.resolve(
 /** @type {Array<{ name: string, path: string, releaseStage: string | null, publishable: boolean, private: boolean }>} */
 export const workspaceCatalog = [
   {
-    name: "@midnight-ntwrk/midnight-verifiable-credential-digital-passport",
-    path: "packages/midnight-verifiable-credential-digital-passport",
+    name: "@midnight-ntwrk/midnight-vc-passport",
+    path: "packages/midnight-vc-passport",
     releaseStage: "supported",
     publishable: true,
     private: false,

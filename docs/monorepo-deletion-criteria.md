@@ -15,8 +15,8 @@ are the handoff contract for the monorepo-side deletion change.
 
 1. **Core contract layer published.** `@midnight-ntwrk/credential-compact` is
    published to the npm registry at the version this repository pins
-   (`0.1.0-rc3`), so the family's registry-clean dependency declaration is
-   satisfiable. **SATISFIED** — `credential-compact@0.1.0-rc3` is published.
+   (`0.2.0-rc1`), so the family's registry-clean dependency declaration is
+   satisfiable. **SATISFIED** — `credential-compact@0.2.0-rc1` is published.
 
 2. **Registry-resolution consumer smoke is green.** This repository's CI smoke
    lane — with no local-path override — packs the family
@@ -40,7 +40,9 @@ are the handoff contract for the monorepo-side deletion change.
 ## What does **not**, by itself, authorize deletion
 
 This repository's consumer smoke is a **registry-resolution** proof: because
-`credential-compact@0.1.0-rc3` and `compact-runtime@0.15.0` are published, the
+`credential-compact@0.2.0-rc1` and `compact-runtime@0.16.0` are published —
+and the core RC is built against that same runtime, so the graph resolves a
+single shared instance — the
 isolated project resolves every dependency from the npm registry (there is no
 tarball-staged form, no `CORE_RC_TARBALL`, and no override). The
 registry-resolution smoke (criterion 2) is the deletion-authorizing proof, and

@@ -18,12 +18,13 @@
 // lanes" — release tooling regressions fail CI). Ported and extended from
 // midnight-verifiable-credentials. Covers version computation, the workspace
 // catalog, publication context rules, the publish-script contract (registry
-// lockdown, provenance flag, idempotent no-op, tag repair), the release
+// lockdown, provenance flag, tokenless idempotent no-op, fail-closed
+// dist-tag drift), the release
 // package contract over sandboxed tarball fixtures, SBOM generation, and the
 // consumer-test argument validation. Everything runs offline: registry views
 // are mocked and tarballs are fixtures.
 
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -51,13 +52,13 @@ import { contractViolations } from "./check-release-package-contract.mjs";
 import { catalogViolations, workspaceCatalog } from "./workspace-catalog.mjs";
 import { parseConsumerArgs, readTarballManifest } from "./test-release-package-consumers.mjs";
 import { packageVerificationCode } from "./generate-release-sbom.mjs";
-import { assertPublishWorkflow } from "./check-security-workflows.mjs";
+import { assertPublishWorkflow, externalActionPinningViolations } from "./check-security-workflows.mjs";
 import { parse as parseYaml } from "yaml";
 
 const SCRIPTS = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPTS, "../..");
-const FAMILY = "@midnight-ntwrk/midnight-verifiable-credential-digital-passport";
-const FAMILY_PATH = "packages/midnight-verifiable-credential-digital-passport";
+const FAMILY = "@midnight-ntwrk/midnight-vc-passport";
+const FAMILY_PATH = "packages/midnight-vc-passport";
 const NPMJS = "https://registry.npmjs.org/";
 
 const node = (args, options = {}) =>
@@ -156,27 +157,6 @@ const MOCK_VIEW = (dir) => {
       "  if (value === undefined) { console.error('E404 Not Found'); process.exit(1); }",
       "  console.log(JSON.stringify(value));",
       "} else { console.error('unsupported mock query: ' + field); process.exit(1); }",
-    ].join("\n")}\n`,
-  );
-  return script;
-};
-
-/** A mockable `npm dist-tag`: updates MOCK_TAGS_FILE and records the call. */
-const MOCK_DIST_TAG = (dir) => {
-  const script = path.join(dir, "mock-dist-tag.mjs");
-  writeFileSync(
-    script,
-    `${[
-      "import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';",
-      "const args = process.argv.slice(2);",
-      "const [sub, nameAtVersion, tag] = args;",
-      "if (sub !== 'add' || !nameAtVersion || !tag) { console.error('unsupported mock call: ' + args.join(' ')); process.exit(1); }",
-      "const version = nameAtVersion.slice(nameAtVersion.lastIndexOf('@') + 1);",
-      "const file = process.env.MOCK_TAGS_FILE;",
-      "const tags = file && existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};",
-      "tags[tag] = version;",
-      "if (file) writeFileSync(file, JSON.stringify(tags));",
-      "appendFileSync(process.env.MOCK_DIST_TAG_LOG, `${nameAtVersion} ${tag}\\n`);",
     ].join("\n")}\n`,
   );
   return script;
@@ -346,7 +326,7 @@ test("release-resolve-context: dispatch-only enforcement and channel/branch rule
     ["rc from develop", "workflow_dispatch", "refs/heads/develop", ["--channel", "rc", "--rc-index", "1"], 0],
     ["rc from main", "workflow_dispatch", "refs/heads/main", ["--channel", "rc", "--rc-index", "2"], 0],
     ["release from main", "workflow_dispatch", "refs/heads/main", ["--channel", "release"], 0],
-    ["snapshot from develop", "workflow_dispatch", "refs/heads/develop", ["--channel", "snapshot"], 0],
+    ["snapshot from develop accepted", "workflow_dispatch", "refs/heads/develop", ["--channel", "snapshot"], 0],
     ["snapshot from main rejected", "workflow_dispatch", "refs/heads/main", ["--channel", "snapshot"], 1],
     ["release from develop rejected", "workflow_dispatch", "refs/heads/develop", ["--channel", "release"], 1],
     ["rc from feature branch rejected", "workflow_dispatch", "refs/heads/feat/x", ["--channel", "rc"], 1],
@@ -365,6 +345,25 @@ test("release-resolve-context: dispatch-only enforcement and channel/branch rule
     const result = resolveContext({ GITHUB_EVENT_NAME: event, GITHUB_REF: ref }, args);
     assert.equal(result.status, expectedExit, `${name}: ${result.stdout} ${result.stderr}`);
   }
+});
+
+test("release-resolve-context: snapshot publications resume with the registry path", () => {
+  // Post-bridge: snapshot is a regular registry channel again (run-number-
+  // stamped version under the `snapshot` dist-tag) and only the generic
+  // branch rule restricts it; no bridge-specific rejection may remain.
+  const accepted = resolveContext(
+    { GITHUB_EVENT_NAME: "workflow_dispatch", GITHUB_REF: "refs/heads/develop" },
+    ["--channel", "snapshot"],
+  );
+  assert.equal(accepted.status, 0, accepted.stderr);
+  assert.doesNotMatch(accepted.stdout + accepted.stderr, /bridge/u);
+
+  const wrongBranch = resolveContext(
+    { GITHUB_EVENT_NAME: "workflow_dispatch", GITHUB_REF: "refs/heads/main" },
+    ["--channel", "snapshot"],
+  );
+  assert.equal(wrongBranch.status, 1);
+  assert.match(wrongBranch.stderr, /snapshot publications are only allowed from 'develop'/u);
 });
 
 test("release-resolve-context: emits the publication context", () => {
@@ -393,121 +392,108 @@ test("release-resolve-context: emits the publication context", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Release tag reconciliation (GitHub-Release bridge)
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
 // Publish-script contract
 // ---------------------------------------------------------------------------
 
-test("publish-script contract: registry lockdown, provenance, public access, tag, no-op, token hygiene", () => {
+test("publish-script contract: registry lockdown, provenance, public access, tag, tokenless no-op, fail-closed drift", () => {
   const script = readFileSync(path.join(SCRIPTS, "publish-npm-packages.sh"), "utf8");
 
   // Registry lockdown: the script hard-fails on any other registry.
   assert.match(script, /must be locked to https:\/\/registry\.npmjs\.org\//u);
 
-  // Provenance-enabled, public-access, tagged publication.
+  // Provenance-enabled, public-access, tagged publication with publish-time
+  // lifecycle scripts disabled.
   assert.match(script, /--provenance/u);
   assert.match(script, /--access public/u);
   assert.match(script, /--tag "\$\{NPM_TAG\}"/u);
+  assert.match(script, /--ignore-scripts/u);
 
-  // Idempotent no-op for an already-published version.
-  assert.match(script, /already published/u);
-  // Dist-tag repair instead of republishing.
-  assert.match(script, /dist-tag|DIST_TAG/u);
+  // Tokenless idempotent no-op for an already-published version.
+  assert.match(script, /tokenless no-op/u);
+  // Dist-tag drift fails closed (trusted publishing cannot mutate dist-tags);
+  // no dist-tag command exists in the script at all.
+  assert.match(script, /cannot repair dist-tags/u);
+  assert.doesNotMatch(script, /npm dist-tag|DIST_TAG_COMMAND/u);
   // Tarball-then-version verification after publish.
   assert.match(script, /post-publish verification/u);
-  // Token hygiene: the token is required but never echoed or passed as an argument.
-  assert.doesNotMatch(script, /echo[^#]*NODE_AUTH_TOKEN/u);
-  assert.doesNotMatch(script, /publish[^#\n]*NODE_AUTH_TOKEN/u);
+  // Trusted publishing: an ambient npm token must be refused, never required.
+  assert.match(script, /NODE_AUTH_TOKEN\/NPM_TOKEN must not be set/u);
+  assert.doesNotMatch(script, /NODE_AUTH_TOKEN is not set/u);
 });
-
-test("publish-script: refuses non-npmjs registries and missing tokens", () => {
+test("publish-script: refuses non-npmjs registries, bad tags, and ambient npm tokens", () => {
   const work = mkdtempSync(path.join(tmpdir(), "publish-contract-"));
   try {
-    const tarball = makeFixtureTarball(work, { version: "9.9.9" });
-    const baseEnv = { ...process.env, NODE_AUTH_TOKEN: "dummy" };
+    makeFixtureTarball(work, { version: "9.9.9" });
 
     const locked = bash(path.join(SCRIPTS, "publish-npm-packages.sh"), ["--npm-tag", "rc", "--artifacts-dir", work], {
-      env: { ...baseEnv, NPM_REGISTRY: "https://evil.example/" },
+      env: { ...process.env, NPM_REGISTRY: "https://evil.example/" },
     });
     assert.equal(locked.status, 1, "a non-npmjs registry must fail before publishing");
     assert.match(locked.stderr, /locked to https:\/\/registry\.npmjs\.org\//u);
 
-    const tokenless = bash(path.join(SCRIPTS, "publish-npm-packages.sh"), ["--npm-tag", "rc", "--artifacts-dir", work], {
-      env: { ...process.env, NPM_REGISTRY: NPMJS },
-    });
-    assert.equal(tokenless.status, 1, "a missing token must fail before publishing");
-    assert.match(tokenless.stderr, /NODE_AUTH_TOKEN is not set/u);
-
     const badTag = bash(path.join(SCRIPTS, "publish-npm-packages.sh"), ["--npm-tag", "nightly", "--artifacts-dir", work], {
-      env: baseEnv,
+      env: { ...process.env },
     });
     assert.equal(badTag.status, 1);
     assert.match(badTag.stderr, /unknown npm tag/u);
-    void tarball;
+
+    // Trusted publishing: an ambient token must be refused — the GitHub OIDC
+    // exchange is the only acceptable identity, and a stray developer token
+    // must never silently override it.
+    const withToken = bash(path.join(SCRIPTS, "publish-npm-packages.sh"), ["--npm-tag", "rc", "--artifacts-dir", work], {
+      env: { ...process.env, NPM_REGISTRY: NPMJS, NODE_AUTH_TOKEN: "stray-developer-token" },
+    });
+    assert.equal(withToken.status, 1, "an ambient npm token must fail before publishing");
+    assert.match(withToken.stderr, /must not be set/u);
+    assert.match(withToken.stderr, /trusted publishing/u);
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
 });
 
-test("publish-script: no-op with dist-tag repair under a mocked registry view", () => {
+test("publish-script: tokenless no-op and fail-closed drift under a mocked registry view", () => {
   const work = mkdtempSync(path.join(tmpdir(), "publish-noop-"));
   try {
     makeFixtureTarball(work, { version: "9.9.9" });
     const mockView = MOCK_VIEW(work);
-    const mockDistTag = MOCK_DIST_TAG(work);
-    const distTagLog = path.join(work, "dist-tag.log");
     const tagsFile = path.join(work, "tags.json");
-    writeFileSync(distTagLog, "");
-    writeFileSync(tagsFile, JSON.stringify({ latest: "9.8.0", rc: "9.9.0" }));
+    writeFileSync(tagsFile, JSON.stringify({ latest: "9.8.0", rc: "9.9.9" }));
 
-    // The version is already published, but the `rc` dist-tag has drifted to
-    // an older release: the script must repair the tag and skip republishing.
-    const result = bash(
-      path.join(SCRIPTS, "publish-npm-packages.sh"),
-      ["--npm-tag", "rc", "--artifacts-dir", work],
-      {
-        env: {
-          ...process.env,
-          NODE_AUTH_TOKEN: "dummy",
-          NPM_VIEW_COMMAND: `node ${mockView}`,
-          NPM_DIST_TAG_COMMAND: `node ${mockDistTag}`,
-          MOCK_VIEW_VERSION: "9.9.9",
-          MOCK_TAGS_FILE: tagsFile,
-          MOCK_DIST_TAG_LOG: distTagLog,
-        },
-      },
-    );
-    assert.equal(result.status, 0, result.stdout + result.stderr);
-    assert.match(result.stdout, /already published/u);
-    assert.match(result.stdout, /repairing/u);
-    assert.equal(
-      readFileSync(distTagLog, "utf8").trim(),
-      `${FAMILY}@9.9.9 rc`,
-      "the mocked registry must record the repaired dist-tag add",
-    );
-    assert.equal(
-      JSON.parse(readFileSync(tagsFile, "utf8")).rc,
-      "9.9.9",
-      "the mocked registry must reflect the repaired dist-tag",
-    );
+    const common = {
+      ...process.env,
+      NPM_VIEW_COMMAND: `node ${mockView}`,
+      MOCK_VIEW_VERSION: "9.9.9",
+      MOCK_TAGS_FILE: tagsFile,
+    };
 
-    // A pure no-op: version published, tag already correct.
+    // A pure no-op: version published, tag already correct — and no token in
+    // the environment anywhere.
     const noop = bash(
       path.join(SCRIPTS, "publish-npm-packages.sh"),
       ["--npm-tag", "rc", "--artifacts-dir", work],
-      {
-        env: {
-          ...process.env,
-          NODE_AUTH_TOKEN: "dummy",
-          NPM_VIEW_COMMAND: `node ${mockView}`,
-          NPM_DIST_TAG_COMMAND: `node ${mockDistTag}`,
-          MOCK_VIEW_VERSION: "9.9.9",
-          MOCK_TAGS_FILE: tagsFile,
-          MOCK_DIST_TAG_LOG: distTagLog,
-        },
-      },
+      { env: common },
     );
     assert.equal(noop.status, 0, noop.stdout + noop.stderr);
-    assert.match(noop.stdout, /no-op/u);
+    assert.match(noop.stdout, /tokenless no-op/u);
     assert.doesNotMatch(noop.stdout, /npm publish/u);
+
+    // The version is already published but the `rc` dist-tag has drifted to
+    // an older release: the run must fail closed (trusted publishing cannot
+    // mutate dist-tags) instead of repairing.
+    writeFileSync(tagsFile, JSON.stringify({ latest: "9.8.0", rc: "9.9.0" }));
+    const drifted = bash(
+      path.join(SCRIPTS, "publish-npm-packages.sh"),
+      ["--npm-tag", "rc", "--artifacts-dir", work],
+      { env: common },
+    );
+    assert.equal(drifted.status, 1, drifted.stdout + drifted.stderr);
+    assert.match(drifted.stderr, /already published but dist-tag 'rc' resolves to '9\.9\.0'/u);
+    assert.match(drifted.stderr, /cannot repair dist-tags/u);
+    assert.doesNotMatch(drifted.stderr + drifted.stdout, /dist-tag add/u);
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
@@ -575,7 +561,6 @@ const makeLaggingNpm = (dir, { version, versionLag }) => {
     env: (extra = {}) => ({
       ...process.env,
       PATH: `${binDir}:${process.env.PATH}`,
-      NODE_AUTH_TOKEN: "dummy",
       MOCK_POLLS_FILE: pollsFile,
       MOCK_PUBLISH_LOG: publishLog,
       MOCK_LAG_VIEW: lagView,
@@ -605,7 +590,7 @@ test("publish-script: post-publish verification retries through registry propaga
     assert.match(result.stderr, /polling again/u);
     assert.match(
       readFileSync(mock.publishLog, "utf8"),
-      /--tag rc --provenance/u,
+      /--tag rc --ignore-scripts --provenance/u,
       "the tarball must have been published exactly once",
     );
     assert.equal(readFileSync(mock.pollsFile, "utf8"), "4");
@@ -632,7 +617,7 @@ test("publish-script: post-publish verification fails closed only after the retr
     assert.equal(result.status, 1);
     assert.match(result.stderr, /post-publish verification failed/u);
     assert.match(result.stderr, /did not become visible/u);
-    assert.match(readFileSync(mock.publishLog, "utf8"), /--tag rc --provenance/u);
+    assert.match(readFileSync(mock.publishLog, "utf8"), /--tag rc --ignore-scripts --provenance/u);
     assert.equal(readFileSync(mock.pollsFile, "utf8"), "4");
   } finally {
     rmSync(work, { recursive: true, force: true });
@@ -668,6 +653,83 @@ test("release package contract: a stripped tarball fails", () => {
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
+});
+
+test("release package contract: emits a deterministic machine-readable report on pass and failure", () => {
+  const work = mkdtempSync(path.join(tmpdir(), "contract-report-"));
+  try {
+    const tarball = makeFixtureTarball(work);
+    const reportFile = path.join(work, "contract-report.json");
+    const pass = node([
+      path.join(SCRIPTS, "check-release-package-contract.mjs"),
+      "--tarball",
+      tarball,
+      "--report",
+      reportFile,
+    ]);
+    assert.equal(pass.status, 0, pass.stderr);
+    const firstBytes = readFileSync(reportFile, "utf8");
+    const report = JSON.parse(firstBytes);
+    assert.equal(report.result, "pass");
+    assert.equal(report.version, "0.1.0");
+    assert.deepEqual(report.tarballs, [
+      {
+        tarball: "midnight-ntwrk-midnight-vc-passport-0.1.0.tgz",
+        passed: true,
+        violations: [],
+      },
+    ]);
+    assert.match(pass.stdout, /report written to .*contract-report\.json/u);
+
+    // Deterministic content: a rerun over the same inputs produces identical
+    // bytes (no timestamps, stable ordering, stable key order).
+    node([
+      path.join(SCRIPTS, "check-release-package-contract.mjs"),
+      "--tarball",
+      tarball,
+      "--report",
+      reportFile,
+    ]);
+    assert.equal(readFileSync(reportFile, "utf8"), firstBytes);
+
+    // The failure path emits the report too (before exiting 1) — the release
+    // evidence carries which check failed, per tarball.
+    const stripped = makeFixtureTarball(work, {
+      version: "0.2.0",
+      mutate: (pkg) => {
+        rmSync(path.join(pkg, "CHANGELOG.md"));
+      },
+    });
+    const failure = node([
+      path.join(SCRIPTS, "check-release-package-contract.mjs"),
+      "--tarball",
+      stripped,
+      "--report",
+      reportFile,
+    ]);
+    assert.equal(failure.status, 1, failure.stdout);
+    const failureReport = JSON.parse(readFileSync(reportFile, "utf8"));
+    assert.equal(failureReport.result, "fail");
+    assert.equal(failureReport.version, "0.2.0");
+    assert.equal(failureReport.tarballs[0].passed, false);
+    assert.ok(
+      failureReport.tarballs[0].violations.some((violation) =>
+        violation.includes("CHANGELOG.md is missing"),
+      ),
+    );
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+test("release package contract: the default report path lands inside tooling/artifacts/", () => {
+  // The workflow's evidence-artifact upload globs tooling/artifacts/ and the
+  // GitHub-Release bridge attaches the report as a release asset: the
+  // artifacts-dir (release) path must write it there — while an ad-hoc
+  // --tarball check stays side-effect-free.
+  const source = readFileSync(path.join(SCRIPTS, "check-release-package-contract.mjs"), "utf8");
+  assert.match(source, /join\(repoRoot, "tooling", "artifacts", "contract-report\.json"\)/u);
+  assert.match(source, /reportPathArg \?\? \(tarballMode \? null : DEFAULT_REPORT_PATH\)/u);
 });
 
 test("release package contract: managed source maps and dist gaps fail", () => {
@@ -726,23 +788,19 @@ test("release package contract: publication-metadata violations are named", () =
 });
 
 // ---------------------------------------------------------------------------
-// npm release state (dist-tag snapshot / verify / repair)
+// npm release state (dist-tag snapshot / verify; fail-closed on drift)
 // ---------------------------------------------------------------------------
 
-test("npm-release-state: snapshot and verify with tag repair under a mocked registry view", () => {
+test("npm-release-state: snapshot and verify under a mocked registry view, drift fails closed", () => {
   const work = mkdtempSync(path.join(tmpdir(), "release-state-"));
   try {
     const mockView = MOCK_VIEW(work);
-    const mockDistTag = MOCK_DIST_TAG(work);
     const stateFile = path.join(work, "state.json");
-    const distTagLog = path.join(work, "dist-tag.log");
     const tagsFile = path.join(work, "tags.json");
-    writeFileSync(distTagLog, "");
     writeFileSync(tagsFile, JSON.stringify({ latest: "0.1.0", rc: "0.1.0-rc1" }));
     const baseEnv = {
       ...process.env,
       MOCK_TAGS_FILE: tagsFile,
-      MOCK_DIST_TAG_LOG: distTagLog,
     };
 
     const snapshot = node([path.join(SCRIPTS, "npm-release-state.mjs"), "--snapshot", "--out", stateFile, "--view-cmd", `node ${mockView}`], {
@@ -759,22 +817,18 @@ test("npm-release-state: snapshot and verify with tag repair under a mocked regi
     );
     assert.equal(ok.status, 0, ok.stderr);
 
-    // Drifted tag: fails closed without --repair …
+    // Drifted tag: fails closed, and there is no repair mode to reach for —
+    // trusted publishing cannot mutate dist-tags.
     const drifted = node(
       [path.join(SCRIPTS, "npm-release-state.mjs"), "--verify", "--snapshot-file", stateFile, "--npm-tag", "rc", "--version", "0.1.0-rc2", "--view-cmd", `node ${mockView}`],
       { env: baseEnv },
     );
     assert.equal(drifted.status, 1);
     assert.match(drifted.stderr, /dist-tag 'rc' resolves to 0\.1\.0-rc1/u);
-
-    // … and repairs with --repair (the mocked registry reflects the repair).
-    const repaired = node(
-      [path.join(SCRIPTS, "npm-release-state.mjs"), "--verify", "--snapshot-file", stateFile, "--npm-tag", "rc", "--version", "0.1.0-rc2", "--repair", "--view-cmd", `node ${mockView}`, "--dist-tag-cmd", `node ${mockDistTag}`],
-      { env: baseEnv },
-    );
-    assert.equal(repaired.status, 0, repaired.stderr);
-    assert.match(readFileSync(distTagLog, "utf8").trim(), / rc$/u);
-    assert.equal(JSON.parse(readFileSync(tagsFile, "utf8")).rc, "0.1.0-rc2");
+    assert.match(drifted.stderr, /cannot repair dist-tags/u);
+    const script = readFileSync(path.join(SCRIPTS, "npm-release-state.mjs"), "utf8");
+    assert.doesNotMatch(script, /--repair/u);
+    assert.doesNotMatch(script, /dist-tag-cmd/u);
 
     // latest protection: a moved latest during a non-release publication fails.
     writeFileSync(tagsFile, JSON.stringify({ latest: "0.2.0", rc: "0.1.0-rc1" }));
@@ -1207,7 +1261,7 @@ test("publish workflow guard: the real workflow satisfies the dedicated assertio
   assert.deepEqual(assertPublishWorkflow(workflow, ".github/workflows/publish.yml"), []);
 });
 
-test("publish workflow guard: mutated workflows fail (push trigger, widened permissions, foreign registry, missing gate)", () => {
+test("publish workflow guard: mutated workflows fail (push trigger, widened or narrowed permissions, foreign registry, missing gate, missing CLI floor)", () => {
   const base = parseYaml(
     readFileSync(path.join(REPO_ROOT, ".github/workflows/publish.yml"), "utf8"),
   );
@@ -1220,15 +1274,56 @@ test("publish workflow guard: mutated workflows fail (push trigger, widened perm
     ),
   );
 
+  // Trusted-publishing permission shape: widened …
   const widened = structuredClone(base);
   widened.jobs.publish.permissions = {
-    contents: "read",
+    contents: "write",
     "id-token": "write",
-    "pull-requests": "write",
   };
   assert.ok(
     assertPublishWorkflow(widened, "publish.yml").some((violation) =>
       violation.includes("exactly contents: read and id-token: write"),
+    ),
+  );
+
+  // … and narrowed (a dropped or downgraded grant must fail just the same).
+  const narrowed = structuredClone(base);
+  narrowed.jobs.publish.permissions = { contents: "read" };
+  assert.ok(
+    assertPublishWorkflow(narrowed, "publish.yml").some((violation) =>
+      violation.includes("exactly contents: read and id-token: write"),
+    ),
+  );
+  const withAttestations = structuredClone(base);
+  withAttestations.jobs.publish.permissions = {
+    contents: "read",
+    "id-token": "write",
+    attestations: "write",
+  };
+  assert.ok(
+    assertPublishWorkflow(withAttestations, "publish.yml").some((violation) =>
+      violation.includes("exactly contents: read and id-token: write"),
+    ),
+  );
+
+  // The trusted-publishing environment gate must never be dropped.
+  const environmentless = structuredClone(base);
+  delete environmentless.jobs.publish.environment;
+  assert.ok(
+    assertPublishWorkflow(environmentless, "publish.yml").some((violation) =>
+      violation.includes("environment: npm-release"),
+    ),
+  );
+
+  // No token may ever be reintroduced — not even as a step env reference.
+  const withToken = structuredClone(base);
+  const publishStep = withToken.jobs.publish.steps.find((step) =>
+    String(step.run ?? "").includes("publish-npm-packages.sh"),
+  );
+  publishStep.env = { ...publishStep.env, NODE_AUTH_TOKEN: "${{ secrets.MIDNIGHTCI_NPMJS_TOKEN }}" };
+  assert.ok(
+    assertPublishWorkflow(withToken, "publish.yml").some((violation) =>
+      violation.includes("must not reference any secret or npm token"),
     ),
   );
 
@@ -1258,6 +1353,19 @@ test("publish workflow guard: mutated workflows fail (push trigger, widened perm
     ),
   );
 
+  // The npm CLI trusted-publishing floor check must stay: an older CLI
+  // cannot exchange the GitHub OIDC token and the publish step would fail
+  // opaquely at the registry.
+  const floorless = structuredClone(base);
+  floorless.jobs.publish.steps = floorless.jobs.publish.steps.filter(
+    (step) => !String(step.run ?? "").includes("supports trusted publishing"),
+  );
+  assert.ok(
+    assertPublishWorkflow(floorless, "publish.yml").some((violation) =>
+      violation.includes("npm CLI supports trusted publishing"),
+    ),
+  );
+
   // Template-injection regression: a ${{ }} expansion inside a run: script
   // must fail the guard even when everything else is intact.
   const inlineExpansion = structuredClone(base);
@@ -1271,58 +1379,35 @@ test("publish workflow guard: mutated workflows fail (push trigger, widened perm
       violation.includes("inside run:"),
     ),
   );
+
+  // An unpinned action ref must fail the external-action pinning assertions
+  // the CI lane runs over the same file — while the real workflow stays clean.
+  const unpinned = structuredClone(base);
+  const checkoutStep = unpinned.jobs.publish.steps.find((step) =>
+    String(step.uses ?? "").startsWith("actions/checkout@"),
+  );
+  checkoutStep.uses = "actions/checkout@v7.0.1";
+  assert.ok(
+    externalActionPinningViolations(unpinned, "publish.yml").some((violation) =>
+      violation.includes("must pin actions/checkout@v7.0.1 to a full commit SHA"),
+    ),
+  );
+  assert.deepEqual(externalActionPinningViolations(base, "publish.yml"), []);
 });
 
-test("publish workflow guard: the npm trusted-publishing gate enforces the full >= 11.5.1 semver", () => {
+test("publish workflow guard: the npm trusted-publishing CLI gate is active", () => {
   const workflow = parseYaml(
     readFileSync(path.join(REPO_ROOT, ".github/workflows/publish.yml"), "utf8"),
   );
   const gateSteps = Object.values(workflow.jobs ?? {})
     .flatMap((job) => job.steps ?? [])
-    .filter((step) => typeof step.run === "string" && step.run.includes("trusted-publishing support"));
-  assert.equal(gateSteps.length, 1, "the publish workflow must carry exactly one npm CLI gate");
-
-  // Execute the exact embedded gate script against stubbed `npm --version`
-  // output, so the comparison logic itself is under test (a two-component
-  // comparison would accept 11.5.0, which predates trusted publishing).
-  const script = /node -e '([^']*)'/u.exec(gateSteps[0].run)?.[1];
-  assert.ok(script, "the gate must be a node -e script");
-  const work = mkdtempSync(path.join(tmpdir(), "npm-gate-"));
-  try {
-    const scriptFile = path.join(work, "gate.cjs");
-    writeFileSync(scriptFile, `${script}\n`);
-    // The preload stubs child_process.execSync so the gate reads the fake
-    // version instead of the runner's real npm.
-    const preload = path.join(work, "stub-npm-version.cjs");
-    writeFileSync(
-      preload,
-      [
-        "const { execSync } = require('node:child_process');",
-        "require('node:child_process').execSync = (command, options) =>",
-        "  process.env.FAKE_NPM_VERSION",
-        "    ? `${process.env.FAKE_NPM_VERSION}\n`",
-        "    : execSync(command, options);",
-      ].join("\n"),
-    );
-
-    const gate = (version) =>
-      node(["--require", preload, scriptFile], {
-        env: { ...process.env, FAKE_NPM_VERSION: version },
-      });
-
-    for (const tooOld of ["10.9.0", "11.4.9", "11.5.0"]) {
-      const result = gate(tooOld);
-      assert.notEqual(result.status, 0, `npm ${tooOld} must be rejected`);
-      assert.match(result.stderr, /predates trusted-publishing support \(needs >= 11\.5\.1\)/u);
-    }
-    for (const supported of ["11.5.1", "11.5.2", "11.6.0", "12.0.0"]) {
-      const result = gate(supported);
-      assert.equal(result.status, 0, result.stderr);
-      assert.match(result.stdout, /supports trusted publishing/u);
-    }
-  } finally {
-    rmSync(work, { recursive: true, force: true });
-  }
+    .filter((step) => typeof step.run === "string" && step.run.includes("supports trusted publishing"));
+  assert.equal(gateSteps.length, 1, "the npm CLI trusted-publishing gate step must be active");
+  assert.match(
+    gateSteps[0].run,
+    />= 11\.5\.1/u,
+    "the gate must enforce the npm CLI floor npm's trusted publishing requires",
+  );
 });
 
 // ---------------------------------------------------------------------------

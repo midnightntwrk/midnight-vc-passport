@@ -14,20 +14,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# npm publication (npm-publication: "Registry publication with provenance" and
-# "Dist-tag safety and idempotency"). Ported from midnight-verifiable-credentials.
-# Publishes the run's packed-and-tested tarballs to the public npmjs registry
-# only, with public access, the channel's dist-tag, and provenance. Re-running
-# for an already-published version and dist-tag is an idempotent no-op; a
-# drifted dist-tag is repaired rather than republished (versions are immutable).
+# npm publication (npm-publication: "Registry publication with trusted
+# publishing" and "Dist-tag safety and idempotency"). Ported from
+# midnight-verifiable-credentials. Publishes the run's packed-and-tested
+# tarballs to the public npmjs registry only, with public access, the
+# channel's dist-tag, and provenance — authenticated by npm Trusted
+# Publishing (the GitHub Actions OIDC exchange under `id-token: write`; no
+# npm token exists, and none may be supplied). Re-running for an
+# already-published version and dist-tag is a tokenless idempotent no-op; a
+# drifted dist-tag fails the run (the trusted-publishing identity cannot
+# mutate dist-tags; repair belongs to a human with registry authority — see
+# the runbook's escalation path).
 #
 #   usage: publish-npm-packages.sh --npm-tag <snapshot|rc|latest> [--artifacts-dir <dir>]
 #
 # Env:
 #   NPM_REGISTRY            must be https://registry.npmjs.org/ (locked)
-#   NODE_AUTH_TOKEN         the org npm automation token (via .npmrc; never an argument)
 #   NPM_VIEW_COMMAND        (tests only) mocked `npm view`
-#   NPM_DIST_TAG_COMMAND    (tests only) mocked `npm dist-tag`
 #   NPM_VIEW_RETRIES        verification poll attempts before failing (default 12)
 #   NPM_VIEW_INTERVAL       seconds between verification polls (default 5)
 
@@ -77,9 +80,8 @@ NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org/}"
 [ "${NPM_REGISTRY}" = "https://registry.npmjs.org/" ] ||
   fail "NPM_REGISTRY must be locked to https://registry.npmjs.org/ (got '${NPM_REGISTRY}')"
 
-# Mockable registry view commands (tooling tests); real runs use npm.
+# Mockable registry view command (tooling tests); real runs use npm.
 VIEW_COMMAND="${NPM_VIEW_COMMAND:-npm view}"
-DIST_TAG_COMMAND="${NPM_DIST_TAG_COMMAND:-npm dist-tag}"
 
 # Post-publish verification budget: registry visibility lags behind a
 # successful publish (the dedicated wait-for-npm-packages.mjs workflow step
@@ -91,9 +93,13 @@ case "${VIEW_RETRIES}" in '' | *[!0-9]*) fail "NPM_VIEW_RETRIES must be a positi
 [ "${VIEW_RETRIES}" -ge 1 ] || fail "NPM_VIEW_RETRIES must be a positive integer (got '${VIEW_RETRIES}')"
 case "${VIEW_INTERVAL}" in '' | *[!0-9]*) fail "NPM_VIEW_INTERVAL must be a non-negative integer of seconds (got '${VIEW_INTERVAL}')" ;; esac
 
-# The token is consumed through .npmrc / the environment only — never workflow
-# inputs, command arguments, repository files, or logs.
-[ -n "${NODE_AUTH_TOKEN:-}" ] || fail "NODE_AUTH_TOKEN is not set; refusing to publish"
+# Trusted publishing: authentication comes from the GitHub Actions OIDC
+# exchange (npm >= 11.5.1 with `id-token: write`); an ambient npm token must
+# never be present, and none is required. The ambient-environment check keeps
+# a stray developer token from silently overriding the trusted identity.
+if [ -n "${NODE_AUTH_TOKEN:-}${NPM_TOKEN:-}" ]; then
+  fail "NODE_AUTH_TOKEN/NPM_TOKEN must not be set: publication authenticates through npm trusted publishing (OIDC), not a token"
+fi
 
 shopt -s nullglob
 TARBALLS=("${ARTIFACTS_DIR}"/*.tgz)
@@ -140,26 +146,32 @@ for TARBALL in "${TARBALLS[@]}"; do
 
   VISIBLE="$(view_json "${NAME}@${VERSION}" version)"
   if [ -n "${VISIBLE}" ]; then
-    # Idempotent no-op: the version is already on the registry. Verify (and if
-    # needed repair) the dist-tag instead of republishing — versions are
-    # immutable and `npm publish` would fail anyway.
+    # Idempotent tokenless no-op: the version is already on the registry —
+    # versions are immutable and `npm publish` would fail anyway. The run
+    # succeeds only when the requested dist-tag already resolves to this
+    # version; a drifted tag fails closed because the trusted-publishing
+    # identity cannot mutate dist-tags (repair belongs to an npm
+    # organization owner — see the runbook's escalation path).
     CURRENT_TAG="$(view_json "${NAME}" "dist-tags.${NPM_TAG}")" || CURRENT_TAG=""
     if [ "${CURRENT_TAG}" = "${VERSION}" ]; then
-      echo "publish-npm-packages: ${NAME}@${VERSION} already published with dist-tag '${NPM_TAG}' — no-op"
+      echo "publish-npm-packages: ${NAME}@${VERSION} already published with dist-tag '${NPM_TAG}' — tokenless no-op"
     else
-      echo "publish-npm-packages: ${NAME}@${VERSION} already published but dist-tag '${NPM_TAG}' resolves to '${CURRENT_TAG:-<unset>}' — repairing"
-      ${DIST_TAG_COMMAND} add "${NAME}@${VERSION}" "${NPM_TAG}" --registry "${NPM_REGISTRY}"
-      view_json_until "${NAME}" "dist-tags.${NPM_TAG}" "${VERSION}" "dist-tag '${NPM_TAG}' for ${NAME} after repair" ||
-        fail "dist-tag repair for ${NAME} '${NPM_TAG}' did not take effect (still not '${VERSION}' after $((VIEW_RETRIES * VIEW_INTERVAL))s)"
+      fail "${NAME}@${VERSION} is already published but dist-tag '${NPM_TAG}' resolves to '${CURRENT_TAG:-<unset>}' — the trusted-publishing identity cannot repair dist-tags; escalate to an npm organization owner (see docs/guides/npmjs-publication.md)"
     fi
     NOOP=$((NOOP + 1))
     continue
   fi
 
+  # Trusted publishing: no token — npm exchanges the GitHub OIDC identity
+  # for a short-lived publish credential. Access and the channel's dist-tag
+  # ride on this invocation; --ignore-scripts keeps the packed (already
+  # built and contract-checked) tarball from executing lifecycle scripts at
+  # publish time.
   npm publish "${TARBALL}" \
     --registry "${NPM_REGISTRY}" \
     --access public \
     --tag "${NPM_TAG}" \
+    --ignore-scripts \
     --provenance
 
   # Tarball-then-version verification: the registry must now resolve the

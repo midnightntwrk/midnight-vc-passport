@@ -45,11 +45,16 @@ const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../..",
 );
-const FAMILY = "@midnight-ntwrk/midnight-verifiable-credential-digital-passport";
+const FAMILY = "@midnight-ntwrk/midnight-vc-passport";
 const NETWORK_ID = "@midnight-ntwrk/midnight-js-network-id";
-const ROUND_TRIP = path.join(repoRoot, "packages/smoke-consumer/scripts/round-trip.mjs");
 
 const SEMVER = /^\d+\.\d+\.\d+(-[\w.-]+)?$/u;
+
+// Test hook: the round-trip runner can be swapped (offline tooling tests
+// exercise the harness against a local HTTP server). Unset in CI,
+// where the real smoke round-trip runs.
+const ROUND_TRIP = process.env.RELEASE_CONSUMER_ROUND_TRIP
+  ?? path.join(repoRoot, "packages/smoke-consumer/scripts/round-trip.mjs");
 
 const fail = (message) => {
   console.error(`[test-release-package-consumers] ${message}`);
@@ -74,7 +79,7 @@ const run = (cmd, args, options = {}) => {
   return result;
 };
 
-/** Argument validation shared by both entry styles (covered by tooling tests). */
+/** Argument validation shared by the entry styles (covered by tooling tests). */
 export const parseConsumerArgs = (argv) => {
   const options = { registry: null, version: null, artifactsDir: null, mode: "tarball" };
   for (let index = 0; index < argv.length; index += 1) {

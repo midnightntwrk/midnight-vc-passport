@@ -28,10 +28,10 @@ import assert from 'node:assert/strict';
 
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 
-import * as root from '@midnight-ntwrk/midnight-verifiable-credential-digital-passport';
-import * as codecs from '@midnight-ntwrk/midnight-verifiable-credential-digital-passport/codecs';
-import * as contract from '@midnight-ntwrk/midnight-verifiable-credential-digital-passport/contract';
-import * as testing from '@midnight-ntwrk/midnight-verifiable-credential-digital-passport/testing';
+import * as root from '@midnight-ntwrk/midnight-vc-passport';
+import * as codecs from '@midnight-ntwrk/midnight-vc-passport/codecs';
+import * as contract from '@midnight-ntwrk/midnight-vc-passport/contract';
+import * as testing from '@midnight-ntwrk/midnight-vc-passport/testing';
 
 // The pure circuits derive on-chain identifiers from the active network id; the
 // undeployed id matches the local/off-chain simulation used by the ported suite.

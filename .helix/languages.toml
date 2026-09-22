@@ -17,7 +17,7 @@
 command = "luau-lsp"
 args = [
   "lsp",
-  "--definitions=.ponos/ponos.d.luau",
+  "--definitions=.ptah/ptah.d.luau",
 ]
 
 [language-server.luau.config.luau-lsp.platform]
