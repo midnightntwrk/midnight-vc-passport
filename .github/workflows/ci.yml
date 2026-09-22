@@ -1,0 +1,85 @@
+name: CI
+
+# The full contract lane: typecheck, lint, build, and test of every workspace,
+# plus the consumer smoke round-trip (boundary evidence for the extraction).
+#
+# The family's core contract dependency (@midnight-ntwrk/credential-compact) and
+# runtime (@midnight-ntwrk/compact-runtime) are both published to npm, so every
+# lane installs from the registry and runs on every push and pull request. The
+# security-hygiene lanes (dependency-review, scorecard, scan) also run regardless.
+#
+# Pushes run on the integration branches (`develop` and `main`) so release
+# candidates have pre-dispatch CI signal before a publication dispatch.
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 4 * * *"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  COMPACT_COMPILER_VERSION: 0.31.1
+  PNPM_CONFIG_AUDIT: "false"
+  PNPM_CONFIG_FUND: "false"
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    # Build-evidence lane (repository-toolchain: "Build evidence for the migration").
+    # Runs compact compilation from source, the package build, and the ported
+    # test suite.
+    name: Typecheck, Lint, Build, Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js, pnpm, and Compact
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          compact-version: ${{ env.COMPACT_COMPILER_VERSION }}
+          github-token: ${{ github.token }}
+
+      - name: Run typecheck, lint, build, and test
+        run: pnpm run all
+
+  smoke:
+    # Consumer-evidence lane (package-distribution: "Consumer consumability
+    # evidence"). Packs the built family tarball, installs it into a clean
+    # environment with registry-only resolution, imports every public entry
+    # point, and runs an issuance/presentation/verification round-trip. This is
+    # the tracked boundary gate.
+    name: Consumer smoke (boundary evidence)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js, pnpm, and Compact
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          compact-version: ${{ env.COMPACT_COMPILER_VERSION }}
+          github-token: ${{ github.token }}
+
+      - name: Run the consumer smoke round-trip
+        run: pnpm --filter smoke-consumer smoke
