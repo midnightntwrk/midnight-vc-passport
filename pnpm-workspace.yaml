@@ -33,6 +33,10 @@ trustPolicyExclude: []
 # manifest's registry-clean dependency policy is unaffected.
 overrides:
   nanoid: 3.3.18
+  # Advisory-driven transitive override: GHSA-2883-xcg3-v3hh (high) is patched
+  # in js-yaml 4.3.2; the lockfile had resolved 4.3.1 (via eslint/espree).
+  # 4.3.2 carries npm provenance attestations. Dev-tooling scope only.
+  js-yaml@<4.3.2: 4.3.2
 
 # Declared (reviewed) build-script allowances: pnpm skips the install scripts
 # of these otherwise-silent dependencies instead of executing them.
