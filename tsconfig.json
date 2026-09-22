@@ -1,0 +1,8 @@
+{
+  "files": [],
+  "references": [{ "path": "./packages/midnight-verifiable-credential-digital-passport" }],
+  "compilerOptions": {
+    "composite": true,
+    "skipLibCheck": true
+  }
+}

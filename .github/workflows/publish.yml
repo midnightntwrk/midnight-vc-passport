@@ -1,0 +1,181 @@
+name: Publish
+
+# The npmjs release train for the digital-passport family package
+# (npm-publication spec). Manually dispatched only — no push, pull_request, or
+# schedule trigger may ever start a publication. The channel/branch gate runs
+# first and fails the run before any build step:
+#   - snapshot: develop only
+#   - rc:       develop or main
+#   - release:  main only
+#
+# The run re-executes the full repository gate itself (never trusts a prior CI
+# run), stamps the release version statelessly into its ephemeral checkout
+# (nothing is committed, tagged, or pushed), packs and contract-checks the
+# tarballs, consumer-tests them from the tarball, snapshots the dist-tags,
+# uploads the release evidence (90-day retention), publishes the tested
+# tarballs with provenance, waits for registry propagation, verifies the
+# dist-tags (protecting `latest` during prereleases), and consumer-tests the
+# published version from the registry.
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Release channel"
+        type: choice
+        options:
+          - snapshot
+          - rc
+          - release
+        required: true
+      version:
+        description: "Base semantic version; must match the root and package manifests (optional confirmation)"
+        type: string
+        required: false
+      rc_index:
+        description: "Release candidate index (rc channel only; defaults to 1)"
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+# A publication must never be cancelled mid-flight by a newer dispatch.
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  COMPACT_COMPILER_VERSION: 0.31.1
+  NPM_REGISTRY: https://registry.npmjs.org/
+  PNPM_CONFIG_AUDIT: "false"
+  PNPM_CONFIG_FUND: "false"
+
+jobs:
+  publish:
+    name: Gate, pack, and publish to npmjs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      # The org npm automation token. Consumed through .npmrc / the
+      # environment only — never workflow inputs, command arguments,
+      # repository files, or logs.
+      NODE_AUTH_TOKEN: ${{ secrets.MIDNIGHTCI_NPMJS_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve publication context (dispatch-only, channel/branch gate)
+        id: context
+        env:
+          # Free-form workflow_dispatch inputs must never be interpolated into
+          # the run: script via ${{ }} (shell-injection risk); env values are
+          # never parsed as shell syntax.
+          RELEASE_CHANNEL: ${{ inputs.channel }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_RC_INDEX: ${{ inputs.rc_index }}
+        run: bash tooling/scripts/release-resolve-context.sh --channel "$RELEASE_CHANNEL" --version "$RELEASE_VERSION" --rc-index "$RELEASE_RC_INDEX"
+
+      - name: Set up Node.js, pnpm, and Compact
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          compact-version: ${{ env.COMPACT_COMPILER_VERSION }}
+          github-token: ${{ github.token }}
+          registry-url: ${{ env.NPM_REGISTRY }}
+
+      - name: Check the npm CLI supports trusted publishing (OIDC path)
+        run: |
+          npm --version
+          node -e 'const v = require("child_process").execSync("npm --version").toString().trim(); const m = /^(\d+)\.(\d+)\.(\d+)/.exec(v); const p = m ? m.slice(1).map(Number) : [0, 0, 0]; const tooOld = p[0] < 11 || (p[0] === 11 && p[1] < 5) || (p[0] === 11 && p[1] === 5 && p[2] < 1); if (!m || tooOld) { throw new Error("npm " + v + " predates trusted-publishing support (needs >= 11.5.1)"); } console.log("npm CLI " + v + " supports trusted publishing");'
+
+      - name: Run the repository gate (security checks, lint, typecheck, build, tests, release tooling)
+        run: pnpm run all
+
+      - name: Run the consumer smoke round-trip
+        run: pnpm run smoke
+
+      - name: Prepare the release version (stateless; never committed back)
+        id: version
+        env:
+          # Outputs flow through env (never ${{ }} inside run:) so no future
+          # validator regression can turn them into shell syntax.
+          RELEASE_CHANNEL: ${{ steps.context.outputs.channel }}
+          RELEASE_RC_INDEX: ${{ steps.context.outputs.rc-index }}
+          RELEASE_BASE_VERSION: ${{ steps.context.outputs.base-version }}
+        run: |
+          ARGS=(--channel "$RELEASE_CHANNEL")
+          if [ -n "$RELEASE_RC_INDEX" ]; then
+            ARGS+=(--rc-index "$RELEASE_RC_INDEX")
+          fi
+          if [ -n "$RELEASE_BASE_VERSION" ]; then
+            ARGS+=(--version "$RELEASE_BASE_VERSION")
+          fi
+          node tooling/scripts/prepare-release-version.mjs "${ARGS[@]}"
+
+      - name: Pack, contract-check, and consumer-test the release tarballs
+        run: pnpm run artifacts:pack
+
+      - name: Generate SPDX SBOMs for the packed tarballs
+        run: node tooling/scripts/generate-release-sbom.mjs
+
+      - name: Snapshot the npm dist-tags before publishing
+        run: node tooling/scripts/npm-release-state.mjs --snapshot --registry "$NPM_REGISTRY"
+
+      - name: Upload the release evidence artifact (90-day retention)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-evidence-${{ steps.version.outputs.version }}
+          path: tooling/artifacts/
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Publish the tested tarballs to npmjs
+        env:
+          RELEASE_NPM_TAG: ${{ steps.version.outputs.npm-tag }}
+        run: bash tooling/scripts/publish-npm-packages.sh --npm-tag "$RELEASE_NPM_TAG"
+
+      - name: Wait for registry propagation
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_NPM_TAG: ${{ steps.version.outputs.npm-tag }}
+        run: node tooling/scripts/wait-for-npm-packages.mjs --version "$RELEASE_VERSION" --npm-tag "$RELEASE_NPM_TAG" --registry "$NPM_REGISTRY"
+
+      - name: Verify the npm dist-tags (fail closed on drift)
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_NPM_TAG: ${{ steps.version.outputs.npm-tag }}
+        run: |
+          ARGS=(--verify --snapshot-file tooling/artifacts/npm-release-state.json --npm-tag "$RELEASE_NPM_TAG" --version "$RELEASE_VERSION" --registry "$NPM_REGISTRY")
+          if [ "$RELEASE_NPM_TAG" != "latest" ]; then
+            ARGS+=(--protect-latest)
+          fi
+          node tooling/scripts/npm-release-state.mjs "${ARGS[@]}"
+
+      - name: Run the registry-mode consumer test
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: node tooling/scripts/test-release-package-consumers.mjs --registry "$NPM_REGISTRY" --version "$RELEASE_VERSION"
+
+      - name: Write the release summary
+        if: always()
+        env:
+          RELEASE_CHANNEL: ${{ steps.context.outputs.channel }}
+          RELEASE_BRANCH: ${{ steps.context.outputs.branch }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_NPM_TAG: ${{ steps.version.outputs.npm-tag }}
+        run: |
+          {
+            echo "## Publication summary"
+            echo ""
+            echo "- channel: \`$RELEASE_CHANNEL\`"
+            echo "- branch: \`$RELEASE_BRANCH\`"
+            echo "- version: \`$RELEASE_VERSION\`"
+            echo "- npm dist-tag: \`$RELEASE_NPM_TAG\`"
+            echo "- registry: \`${NPM_REGISTRY}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

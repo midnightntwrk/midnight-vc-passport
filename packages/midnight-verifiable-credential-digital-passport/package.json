@@ -1,0 +1,117 @@
+{
+  "name": "@midnight-ntwrk/midnight-verifiable-credential-digital-passport",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "Digital-passport verifiable credential family for Midnight: committed claims, selective disclosure, an age-over-threshold predicate, presentation requests, validation circuits, and the protocol model, published as an installable npm package.",
+  "keywords": [
+    "midnight",
+    "verifiable-credential",
+    "digital-passport",
+    "zero-knowledge",
+    "compact",
+    "blockchain"
+  ],
+  "homepage": "https://github.com/midnightntwrk/midnight-verifiable-credential-digital-passport#readme",
+  "bugs": {
+    "url": "https://github.com/midnightntwrk/midnight-verifiable-credential-digital-passport/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/midnightntwrk/midnight-verifiable-credential-digital-passport.git",
+    "directory": "packages/midnight-verifiable-credential-digital-passport"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=24",
+    "pnpm": ">=10.34.5"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./codecs": {
+      "types": "./dist/codecs.d.ts",
+      "require": "./dist/codecs.js",
+      "import": "./dist/codecs.js",
+      "default": "./dist/codecs.js"
+    },
+    "./contract": {
+      "types": "./dist/contract.d.ts",
+      "require": "./dist/contract.js",
+      "import": "./dist/contract.js",
+      "default": "./dist/contract.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "require": "./dist/testing.js",
+      "import": "./dist/testing.js",
+      "default": "./dist/testing.js"
+    },
+    "./managed/digital-passport-credential/contract/index.js": {
+      "types": "./dist/managed/digital-passport-credential/contract/index.d.ts",
+      "import": "./dist/managed/digital-passport-credential/contract/index.js",
+      "default": "./dist/managed/digital-passport-credential/contract/index.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "contract": [
+        "dist/contract.d.ts"
+      ],
+      "codecs": [
+        "dist/codecs.d.ts"
+      ],
+      "testing": [
+        "dist/testing.d.ts"
+      ],
+      "managed/digital-passport-credential/contract/index.js": [
+        "dist/managed/digital-passport-credential/contract/index.d.ts"
+      ]
+    }
+  },
+  "scripts": {
+    "contract": "pnpm run compact",
+    "compact": "node ./scripts/stage-core-compact.mjs && compact compile src/digital-passport-credential.compact src/managed/digital-passport-credential && node ./scripts/strip-managed-sourcemaps.mjs",
+    "clean": "rm -rf dist && rm -rf coverage && rm -rf reports && rm -rf src/managed && rm -rf core-compact-staging",
+    "build": "pnpm run compact && rm -rf dist && mkdir -p dist && tsc -b tsconfig.build.json --force && cp -Rf ./src/managed ./dist/ && cp ./src/digital-passport-credential.compact ./dist && cp -Rf ./src/digital-passport-credential ./dist/",
+    "test": "vitest run",
+    "test:ci": "vitest run",
+    "prepack": "pnpm run build",
+    "lint": "eslint src --ignore-pattern 'src/managed/**'",
+    "lint:fix": "eslint src --fix --ignore-pattern 'src/managed/**'",
+    "typecheck": "pnpm run compact && tsc -p tsconfig.json --noEmit",
+    "all": "pnpm run compact && pnpm run build && pnpm run test:ci"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/compact-runtime": "0.16.0",
+    "@midnight-ntwrk/credential-compact": "0.1.0-rc3"
+  },
+  "devDependencies": {
+    "@midnight-ntwrk/midnight-js-network-id": "4.1.1",
+    "vitest": "4.1.10"
+  },
+  "files": [
+    "dist/**",
+    "src/**/*.compact",
+    "README.md",
+    "CHANGELOG.md",
+    "scripts/*.mjs",
+    "package.json",
+    "tsconfig.json",
+    "tsconfig.build.json"
+  ],
+  "midnight": {
+    "maturity": "reference",
+    "packageClass": "dist"
+  }
+}

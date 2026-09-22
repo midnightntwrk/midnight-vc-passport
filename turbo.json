@@ -1,0 +1,46 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "tsconfig*.json",
+    "eslint.config.*",
+    ".nvmrc"
+  ],
+  "globalEnv": [
+    "COMPACT_DIRECTORY",
+    "COREPACK_HOME"
+  ],
+  "tasks": {
+    "clean": {
+      "cache": false
+    },
+    "lint": {
+      "outputs": []
+    },
+    "lint:fix": {
+      "cache": false,
+      "outputs": []
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": ["src/managed/**"]
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "src/managed/**", "*.tsbuildinfo"]
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "test:ci": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "smoke": {
+      "cache": false,
+      "outputs": []
+    }
+  }
+}

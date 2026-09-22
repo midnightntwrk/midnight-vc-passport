@@ -1,0 +1,46 @@
+{
+  "name": "midnight-verifiable-credential-digital-passport",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24",
+    "pnpm": ">=10.34.5"
+  },
+  "packageManager": "pnpm@10.34.5",
+  "scripts": {
+    "clean": "turbo run clean",
+    "check:security-workflows": "node ./tooling/scripts/check-security-workflows.mjs",
+    "check:vulnerability-exceptions": "node ./tooling/scripts/check-vulnerability-exceptions.mjs",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint:fix",
+    "typecheck": "turbo run typecheck",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "test:ci": "turbo run test:ci",
+    "smoke": "pnpm --filter smoke-consumer smoke",
+    "artifacts:pack": "bash ./tooling/scripts/pack-artifacts.sh",
+    "test:release-tooling": "node --test ./tooling/scripts/release-tooling.test.mjs",
+    "all": "pnpm run check:security-workflows && pnpm run check:vulnerability-exceptions && pnpm run test:release-tooling && pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run test:ci"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@types/node": "24.13.3",
+    "@typescript-eslint/eslint-plugin": "8.65.0",
+    "@typescript-eslint/parser": "8.65.0",
+    "@vitest/coverage-v8": "4.1.10",
+    "eslint": "9.39.5",
+    "eslint-config-prettier": "10.1.5",
+    "eslint-import-resolver-typescript": "3.10.1",
+    "eslint-plugin-import": "2.32.0",
+    "eslint-plugin-prettier": "5.4.1",
+    "eslint-plugin-simple-import-sort": "12.1.1",
+    "prettier": "3.9.6",
+    "turbo": "2.10.7",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vitest": "4.1.10",
+    "yaml": "2.9.0"
+  }
+}
