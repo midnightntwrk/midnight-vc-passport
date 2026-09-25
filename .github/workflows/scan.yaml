@@ -29,7 +29,7 @@ jobs:
           persist-credentials: false
 
       - name: Scan code
-        uses: midnightntwrk/upload-sarif-github-action@e90808cc2a4bde5b3f14b1df426c2f142bc59a37 # includes caller-workspace scan fix
+        uses: midnightntwrk/upload-sarif-github-action@27db6987fad0e7a8eb7b337775d3dd2b876c9608 # includes caller-workspace scan fix
         with:
           fail_severity: "high"
           skip_scorecard_scan: "true"
