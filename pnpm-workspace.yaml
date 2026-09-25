@@ -14,14 +14,16 @@ minimumReleaseAgeExclude:
     # Renovate security update: pnpm@10.34.5
     pnpm@10.34.5,
     # Reviewed, time-boxed exemption for the openspec change
-    # `upgrade-credential-compact`: the dependency bump to 0.2.0-rc1 was
-    # explicitly scheduled past the 7-day window (installs allowed from
-    # 2026-09-25), and the change loop was authorized to proceed early.
-    # The entry is inert once the version is older than the window and can
-    # be dropped in a follow-up cleanup after 2026-09-25. The smoke-consumer's
-    # isolated install mirrors this exact policy into its own config rather
-    # than bypassing it.
-    '@midnight-ntwrk/credential-compact@0.2.0-rc1'
+  # `upgrade-credential-compact`: the dependency bump to 0.2.0-rc1 was
+  # explicitly scheduled past the 7-day window (installs allowed from
+  # 2026-09-25), and the change loop was authorized to proceed early.
+  # The entry is inert once the version is older than the window and can
+  # be dropped in a follow-up cleanup after 2026-09-25. The smoke-consumer's
+  # isolated install mirrors this exact policy into its own config rather
+  # than bypassing it.
+    '@midnight-ntwrk/credential-compact@0.2.0-rc1',
+    # Renovate security update: vitest@4.1.11
+    vitest@4.1.11
   ]
 trustPolicyExclude: []
 
