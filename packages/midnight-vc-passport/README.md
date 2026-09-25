@@ -257,7 +257,7 @@ nix build .#npm-artifacts   # hermetic: offline deps, pinned toolchain, flake-su
 
 The nix output is a flat directory of `.tgz` tarballs (one per publishable
 workspace package); downstream repositories can consume it directly as a
-flake input (`nix build github:midnightntwrk/midnight-verifiable-credential-digital-passport#npm-artifacts`),
+flake input (`nix build github:midnightntwrk/midnight-vc-passport#npm-artifacts`),
 with the `npm-artifacts-contents` flake check guarding the tarball contents
 (dist output, compact sources, scripts, no managed source maps, version
 consistency).

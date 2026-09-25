@@ -1,6 +1,6 @@
-# midnight-verifiable-credential-digital-passport
+# midnight-vc-passport
 
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/midnightntwrk/midnight-verifiable-credential-digital-passport/badge)](https://scorecard.dev/viewer/?uri=github.com/midnightntwrk/midnight-verifiable-credential-digital-passport)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/midnightntwrk/midnight-vc-passport/badge)](https://scorecard.dev/viewer/?uri=github.com/midnightntwrk/midnight-vc-passport)
 
 The standalone home of the **digital-passport verifiable credential family** for
 Midnight. This is the first credential family to graduate out of the
@@ -87,7 +87,7 @@ build the publishable tarballs hermetically from this flake — no local
 toolchain, no network during the build:
 
 ```sh
-nix build github:midnightntwrk/midnight-verifiable-credential-digital-passport#npm-artifacts
+nix build github:midnightntwrk/midnight-vc-passport#npm-artifacts
 ```
 
 The output is a flat directory containing one `.tgz` per publishable

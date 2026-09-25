@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// This file is part of midnightntwrk/midnight-verifiable-credential-digital-passport.
+// This file is part of midnightntwrk/midnight-vc-passport.
 // Copyright (C) Midnight Foundation
 // SPDX-License-Identifier: Apache-2.0
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -93,7 +93,7 @@ export const sbomForTarball = (tarball, workDir) => {
     dataLicense: "CC0-1.0",
     SPDXID: "SPDXRef-DOCUMENT",
     name: `sbom-${manifest.name.replace(/^@/u, "").replace(/\//gu, "-")}-${manifest.version}`,
-    documentNamespace: `https://midnightntwrk.github.io/midnight-verifiable-credential-digital-passport/spdx/releases/${namespaceName}/${manifest.version}/${tarballSha.slice(0, 16)}`,
+    documentNamespace: `https://midnightntwrk.github.io/midnight-vc-passport/spdx/releases/${namespaceName}/${manifest.version}/${tarballSha.slice(0, 16)}`,
     creationInfo: {
       created: new Date().toISOString(),
       creators: ["Tool: generate-release-sbom.mjs", "Organization: Midnight Foundation"],
