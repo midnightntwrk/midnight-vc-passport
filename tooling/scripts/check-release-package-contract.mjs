@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// This file is part of midnightntwrk/midnight-verifiable-credential-digital-passport.
+// This file is part of midnightntwrk/midnight-vc-passport.
 // Copyright (C) Midnight Foundation
 // SPDX-License-Identifier: Apache-2.0
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -53,7 +53,7 @@ const DEFAULT_REPORT_PATH = path.join(repoRoot, "tooling", "artifacts", "contrac
 
 const NPM_PUBLIC_REGISTRY = "https://registry.npmjs.org/";
 const REPOSITORY_URL =
-  "git+https://github.com/midnightntwrk/midnight-verifiable-credential-digital-passport.git";
+  "git+https://github.com/midnightntwrk/midnight-vc-passport.git";
 const SEMVER = /^\d+\.\d+\.\d+(-[\w.-]+)?$/u;
 
 const walk = (dir) => {

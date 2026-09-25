@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# This file is part of midnightntwrk/midnight-verifiable-credential-digital-passport.
+# This file is part of midnightntwrk/midnight-vc-passport.
 # Copyright (C) Midnight Foundation
 # SPDX-License-Identifier: Apache-2.0
 # Licensed under the Apache License, Version 2.0 (the "License");

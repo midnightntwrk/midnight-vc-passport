@@ -11,13 +11,13 @@
     "compact",
     "blockchain"
   ],
-  "homepage": "https://github.com/midnightntwrk/midnight-verifiable-credential-digital-passport#readme",
+  "homepage": "https://github.com/midnightntwrk/midnight-vc-passport#readme",
   "bugs": {
-    "url": "https://github.com/midnightntwrk/midnight-verifiable-credential-digital-passport/issues"
+    "url": "https://github.com/midnightntwrk/midnight-vc-passport/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/midnightntwrk/midnight-verifiable-credential-digital-passport.git",
+    "url": "git+https://github.com/midnightntwrk/midnight-vc-passport.git",
     "directory": "packages/midnight-vc-passport"
   },
   "publishConfig": {

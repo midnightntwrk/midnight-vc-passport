@@ -44,12 +44,17 @@ can be created from repository code; both are attested by their owners:
    | Field               | Value                                                       |
    | ------------------- | ----------------------------------------------------------- |
    | Organization        | `midnightntwrk`                                             |
-   | Repository          | `midnight-verifiable-credential-digital-passport`           |
+   | Repository          | `midnight-vc-passport`                                     |
    | Workflow filename   | `publish.yml` (never rename the workflow file)              |
    | GitHub environment  | `npm-release`                                               |
 
    The mapping binds the package to exactly this repository + workflow +
    environment; a publish from anywhere else is rejected by npm.
+
+   After the GitHub repository rename, npm organization owners must replace
+   any trusted-publisher binding that still names the previous repository
+   with `midnight-vc-passport`. GitHub URL redirects do not update the npm
+   binding; merging this repository change does not change npm settings.
 
 2. **`npm-release` GitHub environment** (repository admin, Settings →
    Environments): required reviewers (a human approves each publication run),

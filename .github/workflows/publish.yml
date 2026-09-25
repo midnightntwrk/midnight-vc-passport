@@ -12,8 +12,8 @@ name: Publish
 # protected `npm-release` GitHub environment with `id-token: write`; npm
 # (>= 11.5.1) exchanges the GitHub Actions OIDC token for a short-lived
 # publish token when the npmjs-side Trusted Publisher mapping matches
-# (organization midnightntwrk, repository midnight-verifiable-credential-
-# digital-passport, workflow filename publish.yml, environment npm-release).
+# (organization midnightntwrk, repository midnight-vc-passport,
+# workflow filename publish.yml, environment npm-release).
 # No npm token secret exists — see docs/guides/npmjs-publication.md for the
 # trusted-publisher prerequisites. The workflow filename must stay
 # `publish.yml`: it is part of the npmjs Trusted Publisher mapping.

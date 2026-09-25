@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// This file is part of midnightntwrk/midnight-verifiable-credential-digital-passport.
+// This file is part of midnightntwrk/midnight-vc-passport.
 // Copyright (C) Midnight Foundation
 // SPDX-License-Identifier: Apache-2.0
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -97,11 +97,11 @@ const makeFixtureTarball = (dir, { name = FAMILY, version = "0.1.0", mutate } = 
         license: "Apache-2.0",
         description: "fixture package for release tooling tests",
         keywords: ["fixture"],
-        homepage: "https://github.com/midnightntwrk/midnight-verifiable-credential-digital-passport#readme",
-        bugs: { url: "https://github.com/midnightntwrk/midnight-verifiable-credential-digital-passport/issues" },
+        homepage: "https://github.com/midnightntwrk/midnight-vc-passport#readme",
+        bugs: { url: "https://github.com/midnightntwrk/midnight-vc-passport/issues" },
         repository: {
           type: "git",
-          url: "git+https://github.com/midnightntwrk/midnight-verifiable-credential-digital-passport.git",
+          url: "git+https://github.com/midnightntwrk/midnight-vc-passport.git",
           directory: FAMILY_PATH,
         },
         publishConfig: { access: "public", registry: NPMJS },
@@ -763,7 +763,7 @@ test("release package contract: publication-metadata violations are named", () =
       JSON.stringify({
         name: FAMILY,
         version: "0.1.0",
-        repository: { url: "git+https://github.com/midnightntwrk/midnight-verifiable-credential-digital-passport.git", directory: "packages/wrong" },
+        repository: { url: "git+https://github.com/midnightntwrk/midnight-vc-passport.git", directory: "packages/wrong" },
         publishConfig: { access: "restricted", registry: "https://registry.evil.example/" },
       }),
     );
