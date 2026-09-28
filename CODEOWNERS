@@ -18,6 +18,8 @@
 /tooling/scripts/wait-for-npm-packages.mjs @midnightntwrk/ex-identus @midnightntwrk/mn-security @midnightntwrk/mn-sre
 /tooling/scripts/npm-release-state.mjs @midnightntwrk/ex-identus @midnightntwrk/mn-security @midnightntwrk/mn-sre
 /tooling/scripts/generate-release-sbom.mjs @midnightntwrk/ex-identus @midnightntwrk/mn-security @midnightntwrk/mn-sre
+/tooling/scripts/verify-release-tag.mjs @midnightntwrk/ex-identus @midnightntwrk/mn-security @midnightntwrk/mn-sre
+/tooling/scripts/publish-github-release.mjs @midnightntwrk/ex-identus @midnightntwrk/mn-security @midnightntwrk/mn-sre
 /docs/guides/npmjs-publication.md @midnightntwrk/ex-identus @midnightntwrk/mn-security @midnightntwrk/mn-sre
 CODE_OF_CONDUCT.md @midnightntwrk/mn-security @midnightntwrk/mn-sre
 CODEOWNERS @midnightntwrk/mn-security @midnightntwrk/mn-sre

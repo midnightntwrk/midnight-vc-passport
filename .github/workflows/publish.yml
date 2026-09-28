@@ -1,12 +1,28 @@
 name: Publish
 
 # The release train for the digital-passport family package
-# (npm-publication spec). Manually dispatched only — no push, pull_request,
-# or schedule trigger may ever start a publication. The channel/branch gate
-# runs first and fails the run before any build step:
-#   - snapshot:  develop only
+# (npm-publication + github-release-distribution specs). Manually dispatched
+# only — no push, pull_request, or schedule trigger may ever start a
+# publication. The channel/branch gate runs first and fails the run before
+# any build step:
 #   - rc:        develop or main
 #   - release:   main only
+#   (snapshot fails closed during the GitHub-Release window: run-number-
+#   stamped versions cannot be pre-tagged by an operator)
+#
+# WINDOW (temporary): GitHub-Release distribution coexists with the npmjs
+# path while the npmjs Trusted Publisher mapping is not configured. The
+# operator creates and pushes the release tag (v<version>) on the release
+# commit and supplies it as the `tag` input; the run reconciles it before any
+# build step (exists, points at the dispatch commit, equals v<resolved
+# version>). After the gate, pack, and SBOM steps, the run creates the GitHub
+# release (prerelease for rc, latest for release) with the tarball +
+# SHA256SUMS + SBOM + contract report, verifies the uploaded digests, attests
+# the assets, and consumer-tests the package from the release URL — all
+# before the npmjs publication, which is then attempted best-effort: a failed
+# attempt leaves the run green and the Release intact, skips the downstream
+# registry steps, and is recorded in the run summary. Exit procedure: see
+# docs/guides/npmjs-publication.md, "GitHub-Release distribution window".
 #
 # Authentication is npm Trusted Publishing: the publish job runs inside the
 # protected `npm-release` GitHub environment with `id-token: write`; npm
@@ -29,6 +45,10 @@ on:
           - rc
           - release
         required: true
+      tag:
+        description: "Release tag (v<version>) the operator created on the dispatched commit; must match the resolved channel version"
+        type: string
+        required: true
       version:
         description: "Base semantic version; must match the root and package manifests (optional confirmation)"
         type: string
@@ -38,8 +58,15 @@ on:
         type: string
         required: false
 
+# WINDOW (temporary): contents: write creates the GitHub release and uploads
+# its assets, attestations: write stores the build-provenance attestations,
+# and id-token: write is both the npm trusted-publishing OIDC identity and the
+# attestation/provenance signer. The window-exit change restores
+# contents: read + id-token: write.
 permissions:
-  contents: read
+  contents: write
+  id-token: write
+  attestations: write
 
 # A publication must never be cancelled mid-flight by a newer dispatch.
 concurrency:
@@ -54,19 +81,23 @@ env:
 
 jobs:
   publish:
-    name: Gate, pack, and publish to npmjs
+    name: Gate, pack, publish the GitHub release, and attempt npmjs
     runs-on: ubuntu-24.04
     # Human gate + branch allow-list for the trusted-publishing identity.
     environment: npm-release
     timeout-minutes: 60
     permissions:
-      contents: read
-      id-token: write
+      contents: write # WINDOW: create the GitHub release and upload its assets
+      id-token: write # npm trusted-publishing OIDC identity + provenance/attestation signer
+      attestations: write # WINDOW: store the build-provenance attestations
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # Full history and tags: the tag reconciliation step resolves the
+          # operator tag (refs/tags/<tag>) with a local git rev-parse, and the
+          # default shallow clone carries no tags at all.
           fetch-depth: 0
 
       - name: Resolve publication context (dispatch-only, channel/branch gate)
@@ -79,6 +110,27 @@ jobs:
           RELEASE_VERSION: ${{ inputs.version }}
           RELEASE_RC_INDEX: ${{ inputs.rc_index }}
         run: bash tooling/scripts/release-resolve-context.sh --channel "$RELEASE_CHANNEL" --version "$RELEASE_VERSION" --rc-index "$RELEASE_RC_INDEX"
+
+      # WINDOW (temporary): the operator-owned release tag is reconciled
+      # immediately after the gate — before tool setup and the expensive
+      # repository gate — so tag/commit/version drift fails the run within
+      # seconds. The workflow never creates, moves, or deletes any ref.
+      - name: Reconcile the operator release tag (window; fail closed on drift)
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_CHANNEL: ${{ steps.context.outputs.channel }}
+          RELEASE_RC_INDEX: ${{ steps.context.outputs.rc-index }}
+          RELEASE_BASE_VERSION: ${{ steps.context.outputs.base-version }}
+          DISPATCH_SHA: ${{ github.sha }}
+        run: |
+          ARGS=(--tag "$RELEASE_TAG" --channel "$RELEASE_CHANNEL" --sha "$DISPATCH_SHA")
+          if [ -n "$RELEASE_RC_INDEX" ]; then
+            ARGS+=(--rc-index "$RELEASE_RC_INDEX")
+          fi
+          if [ -n "$RELEASE_BASE_VERSION" ]; then
+            ARGS+=(--base-version "$RELEASE_BASE_VERSION")
+          fi
+          node tooling/scripts/verify-release-tag.mjs "${ARGS[@]}"
 
       - name: Set up Node.js, pnpm, and Compact
         uses: ./.github/actions/setup-node-pnpm
@@ -135,24 +187,75 @@ jobs:
           retention-days: 90
           if-no-files-found: error
 
+      # WINDOW (temporary): SHA256SUMS over the tarball(s), SBOM(s), and the
+      # contract report, plus the generated release body (channel, version,
+      # install URL, checksums, verification one-liners, changelog link).
+      - name: Generate the release checksums and body (window)
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_CHANNEL: ${{ steps.context.outputs.channel }}
+        run: node tooling/scripts/publish-github-release.mjs prepare --tag "$RELEASE_TAG" --channel "$RELEASE_CHANNEL" --repo "$GITHUB_REPOSITORY"
+
+      # WINDOW (temporary): creates the release on the operator tag (never
+      # moving it) with every asset — prerelease for rc (never latest),
+      # latest for release — or turns a rerun into a verified no-op; any
+      # digest drift fails closed (never --clobber). GH_TOKEN flows only
+      # through the env map.
+      - name: Create the GitHub release and verify the uploaded digests (window)
+        id: release
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_CHANNEL: ${{ steps.context.outputs.channel }}
+          GH_TOKEN: ${{ github.token }}
+        run: node tooling/scripts/publish-github-release.mjs publish --tag "$RELEASE_TAG" --channel "$RELEASE_CHANNEL" --repo "$GITHUB_REPOSITORY"
+
+      # WINDOW (temporary): build-provenance attestations for every uploaded
+      # asset, by sha256 digest.
+      - name: Attest the release assets (build provenance)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            tooling/artifacts/npm/*.tgz
+            tooling/artifacts/sbom/*.spdx.json
+            tooling/artifacts/contract-report.json
+            tooling/artifacts/SHA256SUMS
+
+      # WINDOW (temporary): clean-consumer install from the just-created
+      # release's download URL — the exact path window consumers use.
+      - name: Run the release-URL consumer test (window)
+        env:
+          RELEASE_URL: ${{ steps.release.outputs.release-url }}
+        run: node tooling/scripts/test-release-package-consumers.mjs --release-url "$RELEASE_URL"
+
       # Trusted publishing: no NODE_AUTH_TOKEN — npm exchanges the GitHub
       # OIDC token under id-token: write. Access and the channel's dist-tag
       # ride on the publish invocation itself; the trusted-publishing identity
       # cannot mutate dist-tags after the fact, so drift fails the run (see
       # the runbook's escalation path). An already-published version with the
       # correct tag is a tokenless idempotent no-op.
-      - name: Publish the tested tarballs to npmjs
+      #
+      # WINDOW (temporary): best-effort — the GitHub release above is the
+      # interim channel, so a failed attempt (e.g. npm E404 while the Trusted
+      # Publisher mapping is absent) leaves the job green; the registry steps
+      # below run only when this step succeeded, and the outcome is recorded
+      # in the run summary. The window-exit change removes continue-on-error
+      # and the step guards.
+      - name: Publish the tested tarballs to npmjs (best-effort during the window)
+        id: publish
+        continue-on-error: true
         env:
           RELEASE_NPM_TAG: ${{ steps.version.outputs.npm-tag }}
         run: bash tooling/scripts/publish-npm-packages.sh --npm-tag "$RELEASE_NPM_TAG"
 
       - name: Wait for registry propagation
+        if: steps.publish.outcome == 'success'
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
           RELEASE_NPM_TAG: ${{ steps.version.outputs.npm-tag }}
         run: node tooling/scripts/wait-for-npm-packages.mjs --version "$RELEASE_VERSION" --npm-tag "$RELEASE_NPM_TAG" --registry "$NPM_REGISTRY"
 
       - name: Verify the npm dist-tags (fail closed on drift)
+        if: steps.publish.outcome == 'success'
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
           RELEASE_NPM_TAG: ${{ steps.version.outputs.npm-tag }}
@@ -164,6 +267,7 @@ jobs:
           node tooling/scripts/npm-release-state.mjs "${ARGS[@]}"
 
       - name: Run the registry-mode consumer test
+        if: steps.publish.outcome == 'success'
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: node tooling/scripts/test-release-package-consumers.mjs --registry "$NPM_REGISTRY" --version "$RELEASE_VERSION"
@@ -175,14 +279,25 @@ jobs:
           RELEASE_BRANCH: ${{ steps.context.outputs.branch }}
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
           RELEASE_NPM_TAG: ${{ steps.version.outputs.npm-tag }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_URL: ${{ steps.release.outputs.release-url }}
+          NPM_PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
         run: |
+          case "$NPM_PUBLISH_OUTCOME" in
+            success) NPM_RESULT="published (registry verification ran)" ;;
+            failure) NPM_RESULT="failed — tolerated during the GitHub-Release window; registry steps skipped" ;;
+            *) NPM_RESULT="not attempted (${NPM_PUBLISH_OUTCOME:-run stopped earlier})" ;;
+          esac
           {
             echo "## Publication summary"
             echo ""
             echo "- channel: \`$RELEASE_CHANNEL\`"
             echo "- branch: \`$RELEASE_BRANCH\`"
             echo "- version: \`$RELEASE_VERSION\`"
+            echo "- tag: \`$RELEASE_TAG\`"
+            echo "- GitHub release asset (interim channel): \`$RELEASE_URL\`"
             echo "- npm tag: \`$RELEASE_NPM_TAG\`"
+            echo "- npm publication (best-effort): $NPM_RESULT"
             echo "- registry: \`${NPM_REGISTRY}\`"
             echo "- authentication: npm trusted publishing (OIDC via the \`npm-release\` environment)"
           } >> "$GITHUB_STEP_SUMMARY"
