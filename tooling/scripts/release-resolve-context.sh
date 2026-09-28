@@ -96,6 +96,17 @@ case "${GITHUB_REF}" in
 esac
 BRANCH="${GITHUB_REF#refs/heads/}"
 
+# WINDOW (temporary): GitHub-Release distribution window — the channel input
+# must keep offering snapshot|rc|release (the workflow self-check pins those
+# options), but snapshot is structurally incompatible with the operator-owned
+# release tags the window requires: a run-number-stamped version cannot be
+# known before the operator creates the tag. Fail closed here, before any
+# build step. Remove this guard when the window exits (see
+# docs/guides/npmjs-publication.md, "GitHub-Release distribution window").
+if [ "${CHANNEL}" = "snapshot" ]; then
+  fail "channel 'snapshot' is not available during the GitHub-Release distribution window: run-number-stamped snapshot versions cannot be pre-tagged by an operator (dispatch 'rc' or 'release' instead)"
+fi
+
 case "${CHANNEL}:${BRANCH}" in
   snapshot:develop) ;;
   rc:develop | rc:main) ;;

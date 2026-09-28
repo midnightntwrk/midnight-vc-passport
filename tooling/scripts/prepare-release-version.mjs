@@ -96,6 +96,24 @@ export const computeReleaseVersion = ({
   return { version: baseVersion, npmTag: "latest" };
 };
 
+/**
+ * The release-tag naming scheme (github-release-distribution: "Operator-owned
+ * release tags"): a release tag is `v` + the resolved channel version
+ * (`v0.1.0`, `v0.1.0-rc3`). Shared by the publication workflow's tag
+ * reconciliation (`verify-release-tag.mjs`) so the scheme lives in exactly
+ * one module — never duplicated. `snapshot` is structurally untaggable: its
+ * run-number stamp cannot be known before dispatch.
+ */
+export const expectedReleaseTag = ({ channel, baseVersion, rcIndex }) => {
+  if (channel === "snapshot") {
+    throw new Error(
+      "snapshot versions cannot be pre-tagged: the run-number stamp is unknown before dispatch",
+    );
+  }
+  const { version } = computeReleaseVersion({ channel, baseVersion, rcIndex });
+  return `v${version}`;
+};
+
 const shortCommitSha = () => {
   const sha = process.env.GITHUB_SHA ?? execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, encoding: "utf8" }).trim();
   return sha.slice(0, 7);

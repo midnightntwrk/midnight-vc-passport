@@ -3,7 +3,7 @@
 /.pesde/
 # <<< ptah
 
-# Per-issue factory worktrees. Kept outside the managed section above so
-# `ptah init` cannot drop it. Mirrors WORKTREE_PARENT in
-# workflows/factory/main.luau.
+# Worktrees provisioned under `.ptah/worktree/` by workflows that isolate
+# (the pr-review shim) via libs.std.worktree. Kept outside the managed section
+# above so `ptah init` cannot drop it.
 /worktree/

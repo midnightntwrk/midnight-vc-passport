@@ -13,15 +13,12 @@ minimumReleaseAgeExclude:
   [
     # Renovate security update: pnpm@10.34.5
     pnpm@10.34.5,
-    # Reviewed, time-boxed exemption for the openspec change
-    # `adopt-credential-compact-020`: the stable 0.2.0 (published 2026-09-25)
-    # is byte-identical to the previously exempted 0.2.0-rc1 apart from the
-    # version field, and carries npm provenance attestations. The entry is
-    # inert once the version is older than the window (installs allowed from
-    # 2026-10-02) and can be dropped in a follow-up cleanup after that date.
-    # The smoke-consumer's isolated install mirrors this exact policy into its
-    # own config rather than bypassing it.
-    '@midnight-ntwrk/credential-compact@0.2.0'
+    # First-party package (published from midnightntwrk with npm provenance
+    # attestations): exempt by name so a fresh credential-compact release can
+    # be adopted without waiting out the window. The smoke consumer and the
+    # release consumer tests mirror this policy into their isolated installs
+    # rather than bypassing it.
+    '@midnight-ntwrk/credential-compact'
   ]
 trustPolicyExclude: []
 
