@@ -20,8 +20,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - Bumped the core contract dependency to
-  **`@midnight-ntwrk/credential-compact@0.2.0-rc1`** (was `0.1.0-rc3`). The
-  new RC is compiled with the same Compact 0.31.1 toolchain and pins the same
+  **`@midnight-ntwrk/credential-compact@0.2.0`** (was `0.1.0-rc3`; tracked
+  `0.2.0-rc1` during development, whose published contents are identical to
+  the stable `0.2.0` apart from the version field). The new core is compiled with the same Compact 0.31.1 toolchain and pins the same
   `@midnight-ntwrk/compact-runtime@0.16.0` as this package, so the dependency
   graph resolves a single shared runtime instance (the former private 0.15.0
   runtime residency required by rc3 is gone).

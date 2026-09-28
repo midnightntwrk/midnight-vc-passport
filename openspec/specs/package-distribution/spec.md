@@ -29,7 +29,7 @@ The package SHALL expose exactly these entry points: the root entry (family cont
 
 ### Requirement: Registry-resolvable dependencies
 
-The **publishable manifest** SHALL depend only on packages resolvable from the npm registry at pinned semantic versions — the published contract layer `@midnight-ntwrk/credential-compact` (pinned to `0.2.0-rc1`, the RC built against the same Compact 0.31.1 toolchain and `compact-runtime@0.16.0` the family pins) and `@midnight-ntwrk/compact-runtime` pinned to `0.16.0`. The publishable manifest SHALL contain no `workspace:`, `file:`, git, URL, or sibling-path dependencies, and no dependency on the monorepo's openid package.
+The **publishable manifest** SHALL depend only on packages resolvable from the npm registry at pinned semantic versions — the published contract layer `@midnight-ntwrk/credential-compact` (pinned to `0.2.0`, the stable release built against the same Compact 0.31.1 toolchain and `compact-runtime@0.16.0` the family pins) and `@midnight-ntwrk/compact-runtime` pinned to `0.16.0`. The publishable manifest SHALL contain no `workspace:`, `file:`, git, URL, or sibling-path dependencies, and no dependency on the monorepo's openid package.
 
 The runtime-version guard contract SHALL hold for both code paths that load generated contract code:
 
@@ -41,7 +41,7 @@ The family SHALL consume the core's managed contract API through the package spe
 #### Scenario: Publishable manifest is registry-clean
 
 - **WHEN** the publishable (family) package manifest is inspected
-- **THEN** it declares only registry-resolvable semver dependencies (`credential-compact@0.2.0-rc1`, `compact-runtime@0.16.0`), with no `workspace:`/`file:`/git/URL/sibling-path entries
+- **THEN** it declares only registry-resolvable semver dependencies (`credential-compact@0.2.0`, `compact-runtime@0.16.0`), with no `workspace:`/`file:`/git/URL/sibling-path entries
 
 #### Scenario: Registry resolution confirmed
 
