@@ -1,40 +1,18 @@
 --!strict
 -- PR review workflow: run the convergent review→validate→fix→verify loop
--- against one pull request whose URL the caller injects through the
--- `PR_URL` environment variable.
---
--- The `pr` playbook (the PR review loop) owns the whole loop — the
--- discovery/delta review passes, the typed judge and its persistent ledger,
--- the batched fix-and-push turns, and the posted PR review report. This
--- shim owns the local config (agent handles, model, cap), the `PR_URL`
--- lookup, and the git context those fix turns need, so a caller composes it
--- as:
+-- against one pull request, whose URL the caller injects via `PR_URL`.
 --
 --   PR_URL=https://github.com/owner/repo/pull/123 \
 --     ptah run .ptah/workflows/pr-review/main.luau
 --
--- The git context is a provisioned worktree on the PR's head branch. The
--- playbook is git-agnostic (its `workingDir` is just a directory, and
--- provisioning it is the calling shim's business), and with `dryRun = false`
--- its fix turns commit and push from the sessions' working directory — so
--- every session runs in a checkout of the PR branch and the invocation
--- directory's own branch never matters. A caller must know: the PR must
--- live in this repository (a fork PR is rejected up front on
--- `isCrossRepository`, and the head branch name is pinned to the PR's
--- exact head commit after a fetch — a name colliding with one of this
--- repository's own branches fails the pin instead of silently
--- provisioning the worktree on the wrong branch), the invocation
--- checkout must not itself be on the PR head branch (git refuses one
--- branch in two worktrees — also a loud failure), and the worktree is
--- torn down after the loop (refuse dirty: an uncommitted fix keeps it,
--- logged; the branch survives teardown).
+-- The `pr` playbook owns the loop (review passes, typed judge, persistent
+-- ledger, batched fix-and-push turns, the posted report); this shim owns the
+-- local config, the `PR_URL` lookup, and the worktree the fix turns push
+-- from. The PR must live in this repository — a fork PR is rejected up front.
+-- One loop per PR at a time: concurrent runs corrupt the ledger comment.
 --
--- Environment requirements (declared by the playbook, not bundled here):
--- the `pi` agent must resolve in the ptah registry (.ptah/config.toml or
--- the user layer), `gh` must be on PATH, authenticated, with the PR URL
--- a GitHub pull request URL, and `git` must be on PATH for the worktree
--- steps. One loop per PR: two concurrent runs on one PR corrupt the
--- ledger comment.
+-- Environment: the `pi` agent must resolve in the ptah registry, and `gh`
+-- (authenticated) and `git` must be on PATH.
 
 local libs = require("@ptah_libs")
 
@@ -44,14 +22,12 @@ local pr = libs.pr
 -- Local config
 -- ---------------------------------------------------------------------------
 
--- The review model, shared by the reviewer, the judge, and the reporter.
--- The three configs stay split so a per-role model can be introduced without
--- rewiring the constructor below.
-local MODEL = "zai/glm-5.3"
+-- Shared today, but split per role so a per-role model can be introduced
+-- without rewiring the constructor.
+local MODEL = "ollama-cloud/deepseek-v4.1-flash"
 
--- Convergence cap: at the cap with open blocking findings the loop ends
--- non-converged without pushing a final fix (every push is followed by at
--- least one review pass).
+-- At the cap with open blocking findings the loop ends non-converged without
+-- pushing a final fix (every push is followed by at least one review pass).
 local MAX_REVIEW_ITERATIONS = 10
 
 local sessionConfig = { { id = "model", value = MODEL } }
@@ -62,9 +38,6 @@ local reporterConfig = { { id = "model", value = MODEL } }
 -- The injected PR URL
 -- ---------------------------------------------------------------------------
 
--- The caller injects the pull request through PR_URL. An unset or empty
--- variable is a loud misconfiguration: there is no PR to review and no
--- repository context to fall back on.
 local function injectedPrUrl(): string
 	local url = os.getenv("PR_URL")
 	if url == nil or url == "" then
@@ -73,8 +46,8 @@ local function injectedPrUrl(): string
 	return url
 end
 
--- The PR number from the URL, naming the worktree (`pr-<n>`) so it never
--- collides with the factory's per-issue worktrees (`issue-<n>`).
+-- Names the worktree `pr-<n>`, so it never collides with the factory's
+-- per-issue worktrees (`issue-<n>`).
 local function prNumber(prUrl: string): string
 	local number = string.match(prUrl, "^https?://github%.com/[^/]+/[^/]+/pull/(%d+)")
 	if number == nil then
@@ -90,26 +63,16 @@ end
 local gh = libs.std.gh
 local worktree = libs.std.worktree
 
--- The PR head's identity as GitHub reports it — the branch name and the
--- exact head commit — plus the cross-repository fact, read in one API
--- call because provisioning consumes them as one fact: a branch name
--- alone is not evidence that `origin/<name>` is the PR's head.
---
--- A fork PR is rejected here, on `isCrossRepository`, before anything is
--- provisioned: its head branch lives in another repository, which this
--- repository's origin can neither fetch nor push, so the loop's fix turns
--- could never reach the PR. The rejection cannot rest on
--- `origin/<name>` failing to resolve — when the fork's branch name
--- collides with a branch of this repository (a fork's `develop` against
--- this repo's `origin/develop`) the name *does* resolve, to the wrong,
--- local branch, and the worktree would be provisioned silently on it
--- with every fix turn pushing agent commits onto that branch (straight
--- onto `origin/develop`) while the fork PR never updates.
 type PrHead = {
 	branch: string,
 	oid: string,
 }
 
+-- A fork PR is rejected here: its head lives in another repository that this
+-- origin can neither fetch nor push, so the loop's fix turns could never
+-- reach the PR. The rejection rests on `isCrossRepository`, not on
+-- `origin/<branch>` failing to resolve — a fork branch whose name collides
+-- with a local branch would resolve to the wrong commit.
 local function prHead(prUrl: string): PrHead
 	local outcome = gh.run({ "pr", "view", prUrl, "--json", "headRefName,headRefOid,isCrossRepository" }, { json = true })
 	if not outcome.ok then
@@ -131,29 +94,21 @@ local function prHead(prUrl: string): PrHead
 	return { branch = branch, oid = oid }
 end
 
--- POSIX sh single-quoting, the stdlib libs' own: a branch name may carry
--- characters a shell would otherwise reinterpret.
+-- POSIX sh single-quoting: a branch name may carry characters a shell would
+-- otherwise reinterpret.
 local function quote(arg: string): string
 	return "'" .. (arg:gsub("'", "'\\''")) .. "'"
 end
 
--- Two-sided trim, matching the stdlib transports: command output carries
--- surrounding whitespace that is not part of the value.
 local function trim(s: string): string
 	local trimmed = (s:gsub("^%s+", ""))
 	return (trimmed:gsub("%s+$", ""))
 end
 
--- Pin the branch name to the head commit before anything is provisioned:
--- after a plain fetch (provision's own fetch shape),
--- `refs/remotes/origin/<branch>` must resolve to exactly the commit
--- GitHub reports as the PR's head. A same-named ref that is missing or
--- resolves to any other commit — a colliding branch name, a renamed or
--- deleted head, a local view of some other repository — fails loudly
--- here instead of provisioning the worktree on a branch the PR does not
--- track, which is where the fix turns' pushes would silently land. Runs
--- in the invocation directory, the same repository provision operates
--- on.
+-- After a plain fetch, `origin/<branch>` must resolve to exactly the commit
+-- GitHub reports as the PR's head; a missing or divergent ref fails loudly
+-- here rather than provisioning on a branch the PR does not track, where the
+-- fix turns' pushes would silently land.
 local function pinOriginHead(prUrl: string, head: PrHead)
 	local fetched = ptah.exec("git fetch origin")
 	if fetched.exitCode ~= 0 then
@@ -181,10 +136,8 @@ local function pinOriginHead(prUrl: string, head: PrHead)
 	end
 end
 
--- Provision the worktree the loop's sessions run in: on the PR head
--- branch, its name pinned to the head commit first, fetched, adopting an
--- earlier run's worktree (same path, same branch) so an interrupted
--- review resumes. Fix turns commit and push from here; the invocation
+-- Provision the worktree the sessions run in, adopting an earlier run's
+-- (same path, same branch) so an interrupted review resumes; the invocation
 -- directory is never touched.
 local function prepareWorktree(prUrl: string): { path: string, branch: string, ref: string }
 	local head = prHead(prUrl)
@@ -205,13 +158,11 @@ local work = ptah.agent("pi")
 local judge = ptah.agent("pi")
 local reporter = ptah.agent("pi")
 
--- `reviewInstruction` is left nil, which selects the playbook's built-in
--- reviewer persona. Configure one (or the pointer pattern, e.g.
--- "Follow the reviewer instruction at .ptah/instructions/reviewer.md") to
--- fully replace it.
 local prUrl = injectedPrUrl()
 local wt = prepareWorktree(prUrl)
 
+-- `reviewInstruction` is a full replacement of the playbook's built-in
+-- reviewer persona.
 local reviewLoop = pr.new({
 	agent = work,
 	judgeAgent = judge,
@@ -227,10 +178,9 @@ local reviewLoop = pr.new({
 
 ptah.log(("pr-review: reviewing %s (worktree %s on branch %s)"):format(prUrl, wt.path, wt.branch))
 
-local outcome = reviewLoop:review(prUrl)
+local outcome = reviewLoop:reviewFixLoop(prUrl)
 
--- The playbook counts convergence from the ledger's open blocking findings;
--- restate that count here for the run's tail log. The terminal report is
+-- Restate the ledger's open blocking count for the tail log; the report is
 -- already posted as a marked PR comment and returned as `outcome.report`.
 local openBlocking = 0
 for _, finding in outcome.ledger.findings do
@@ -240,9 +190,8 @@ for _, finding in outcome.ledger.findings do
 end
 ptah.log(("pr-review: %s (%d open blocking finding(s))"):format(outcome.status, openBlocking))
 
--- Tear the worktree down now the loop is done: refuse-dirty by default, so
--- an uncommitted fix keeps it (logged below) rather than losing state; the
--- branch survives teardown either way.
+-- Refuse-dirty teardown: an uncommitted fix keeps the worktree (logged
+-- below); the branch survives either way.
 local removed = worktree.teardown(wt)
 if not removed.ok then
 	ptah.log(("pr-review: worktree kept at %s: %s"):format(wt.path, tostring(removed.stderr)))
