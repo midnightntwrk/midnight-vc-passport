@@ -50,7 +50,7 @@ import {
 } from "./prepare-release-version.mjs";
 import { contractViolations } from "./check-release-package-contract.mjs";
 import { catalogViolations, workspaceCatalog } from "./workspace-catalog.mjs";
-import { parseConsumerArgs, readTarballManifest } from "./test-release-package-consumers.mjs";
+import { parseConsumerArgs, readTarballManifest, releaseAgePolicy } from "./test-release-package-consumers.mjs";
 import { packageVerificationCode } from "./generate-release-sbom.mjs";
 import { assertPublishWorkflow, externalActionPinningViolations } from "./check-security-workflows.mjs";
 import { parse as parseYaml } from "yaml";
@@ -1074,6 +1074,27 @@ test("test-release-package-consumers: registry-mode argument validation", () => 
   assert.throws(() => parseConsumerArgs(["--registry", NPMJS, "--version", "not-a-version"]), /semantic version/u);
   assert.deepEqual(parseConsumerArgs(["--registry", NPMJS, "--version", "0.1.0-rc1"]).mode, "registry");
   assert.deepEqual(parseConsumerArgs([]).mode, "tarball");
+});
+
+test("test-release-package-consumers: clean projects mirror the workspace release-age policy", () => {
+  // The real workspace: floor and first-party exclusion mirrored, plus the
+  // package under test (registry mode installs it moments after publishing).
+  const policy = releaseAgePolicy();
+  assert.ok(Number.isInteger(policy.minimumReleaseAge) && policy.minimumReleaseAge > 0);
+  assert.ok(policy.minimumReleaseAgeExclude.includes("@midnight-ntwrk/credential-compact"));
+  assert.ok(policy.minimumReleaseAgeExclude.includes(FAMILY));
+
+  // Fail closed without a floor.
+  const work = mkdtempSync(path.join(tmpdir(), "consumer-policy-"));
+  try {
+    const noFloor = path.join(work, "pnpm-workspace.yaml");
+    writeFileSync(noFloor, "packages:\n  - packages/*\n");
+    assert.throws(() => releaseAgePolicy(noFloor), /no minimumReleaseAge floor/u);
+    writeFileSync(noFloor, "minimumReleaseAge: 10080\n");
+    assert.deepEqual(releaseAgePolicy(noFloor).minimumReleaseAgeExclude, [FAMILY]);
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
 });
 
 test("test-release-package-consumers: tarball installs use a short relative path (ENAMETOOLONG guard)", () => {

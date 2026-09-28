@@ -34,10 +34,12 @@
 //     the public registry and run the same round-trip.
 
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+
+import { parse as parseYaml } from "yaml";
 
 import { publishableWorkspaces } from "./workspace-catalog.mjs";
 
@@ -61,10 +63,22 @@ const fail = (message) => {
   process.exit(1);
 };
 
+// `pnpm run` injects the workspace's own pnpm settings (including
+// `minimumReleaseAge`) into child environments as `npm_config_*` variables,
+// but cannot carry the exclusion list through the environment. Those leaked
+// variables are stripped (they would override the clean project's own
+// policy), and the clean project instead gets the workspace's release-age
+// floor and exclusions mirrored into its own pnpm-workspace.yaml — the same
+// approach as packages/smoke-consumer/scripts/smoke.mjs.
+const consumerEnv = Object.fromEntries(
+  Object.entries(process.env).filter(([key]) => !/release.?age/iu.test(key)),
+);
+
 const run = (cmd, args, options = {}) => {
   const result = spawnSync(cmd, args, {
     stdio: ["ignore", "pipe", "pipe"],
     encoding: "utf8",
+    env: consumerEnv,
     ...options,
   });
   if (result.stdout) {
@@ -116,9 +130,42 @@ const consumerRoundTrip = (isolated, { label }) => {
   run("node", ["round-trip.mjs"], { cwd: isolated });
 };
 
-/** Creates the clean consumer project skeleton shared by both modes. */
+/**
+ * The workspace's supply-chain release-age policy (pnpm-workspace.yaml), read
+ * from the file so leaked environment variables cannot shadow it. Fail-closed:
+ * without a floor the consumer test refuses to install anything. The package
+ * under test is always excluded on top of the workspace list: it is our own
+ * package, and registry mode installs it moments after publication.
+ */
+export const releaseAgePolicy = (workspaceFile = path.join(repoRoot, "pnpm-workspace.yaml")) => {
+  const workspace = parseYaml(readFileSync(workspaceFile, "utf8")) ?? {};
+  const { minimumReleaseAge } = workspace;
+  if (!Number.isInteger(minimumReleaseAge) || minimumReleaseAge <= 0) {
+    throw new Error(
+      "the workspace declares no minimumReleaseAge floor; refusing to install without a release-age policy",
+    );
+  }
+  const exclude = [...(workspace.minimumReleaseAgeExclude ?? []), FAMILY];
+  return { minimumReleaseAge, minimumReleaseAgeExclude: [...new Set(exclude)] };
+};
+
+/** Serializes the policy as the clean project's pnpm-workspace.yaml. */
+const renderReleaseAgePolicy = ({ minimumReleaseAge, minimumReleaseAgeExclude }) =>
+  `${[
+    "# Supply-chain policy mirrored from the repository workspace",
+    "# (pnpm-workspace.yaml), plus the package under test.",
+    `minimumReleaseAge: ${minimumReleaseAge}`,
+    "minimumReleaseAgeExclude:",
+    ...minimumReleaseAgeExclude.map((entry) => `  - '${String(entry).replaceAll("'", "''")}'`),
+  ].join("\n")}\n`;
+
+/** Creates the clean consumer project skeleton shared by every mode. */
 const cleanProject = () => {
   const isolated = mkdtempSync(path.join(tmpdir(), "release-consumer-"));
+  writeFileSync(
+    path.join(isolated, "pnpm-workspace.yaml"),
+    renderReleaseAgePolicy(releaseAgePolicy()),
+  );
   writeFileSync(
     path.join(isolated, "package.json"),
     `${JSON.stringify(
