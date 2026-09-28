@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- First GitHub-Release distribution window release: **`v0.1.0-rc2`**
+  dispatched on `develop` at `e4b5160` (channel `rc`, `rc_index=2`,
+  [run 36428782614](https://github.com/midnightntwrk/midnight-vc-passport/actions/runs/36428782614)). The
+  [prerelease](https://github.com/midnightntwrk/midnight-vc-passport/releases/tag/v0.1.0-rc2) (never latest)
+  carries the contract-checked tarball, `SHA256SUMS`, the SPDX SBOM, and the
+  package-contract report; every uploaded digest matched the packed
+  artifact, the release-URL consumer round-trip passed, and every asset's
+  build-provenance attestation verified via `gh attestation verify`. The
+  best-effort npmjs publication failed with `E404` (Trusted Publisher
+  mapping not yet configured) and was tolerated as designed; the window's
+  exit condition lives in the
+  [publication runbook](docs/guides/npmjs-publication.md#window-exit-condition).
+
 - First bridge release: **`v0.1.0-rc1`** dispatched on `develop` (channel
   `rc`, [run 33615405618](https://github.com/midnightntwrk/midnight-verifiable-credential-digital-passport/actions/runs/33615405618))
   through the temporary GitHub-Release distribution bridge pending the npmjs

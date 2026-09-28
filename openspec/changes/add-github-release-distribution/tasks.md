@@ -35,5 +35,5 @@
 
 ## 6. First window dispatch (operator-manual, after merge)
 
-- [ ] 6.1 Operator creates and pushes tag `v0.1.0-rc2` on the release commit and dispatches `channel=rc`, `rc_index=2`, `tag=v0.1.0-rc2` from a permitted branch; verify the run passes gate/pack/reconciliation, creates a non-latest prerelease carrying tarball + SHA256SUMS + SBOM + contract report + generated body, passes the release-URL consumer test, and records the best-effort npm outcome
-- [ ] 6.2 Operator verifies `gh attestation verify` succeeds against the uploaded assets and records the window release in the root and package changelogs
+- [x] 6.1 Operator creates and pushes tag `v0.1.0-rc2` on the release commit and dispatches `channel=rc`, `rc_index=2`, `tag=v0.1.0-rc2` from a permitted branch; verify the run passes gate/pack/reconciliation, creates a non-latest prerelease carrying tarball + SHA256SUMS + SBOM + contract report + generated body, passes the release-URL consumer test, and records the best-effort npm outcome
+- [x] 6.2 Operator verifies `gh attestation verify` succeeds against the uploaded assets and records the window release in the root and package changelogs
