@@ -31,7 +31,7 @@
 
 - [x] 5.1 Run the full offline gate `pnpm run all` (security self-check, vulnerability exceptions, release-tooling tests, lint, typecheck, build, tests) and `pnpm run artifacts:pack`; verify both are green with the window workflow present
 - [x] 5.2 Dry-run the tag path: create a scratch tag locally, exercise `verify-release-tag.mjs` against match and mismatch cases, delete the scratch tag; verify `git status --porcelain` is clean afterward and manifests retain `0.1.0`
-- [ ] 5.3 Confirm the change PR title passes the PR-title gate and CI is green on the working branch
+- [x] 5.3 Confirm the change PR title passes the PR-title gate and CI is green on the working branch
 
 ## 6. First window dispatch (operator-manual, after merge)
 
