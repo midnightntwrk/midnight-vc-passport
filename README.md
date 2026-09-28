@@ -103,7 +103,7 @@ helper scripts, no managed source maps, version consistency). Adding a new
 publishable package under `packages/` flows into this output automatically.
 
 > **Published-core note:** the family's core contract dependency
-> `@midnight-ntwrk/credential-compact@0.2.0-rc1` is published to npm and is
+> `@midnight-ntwrk/credential-compact@0.2.0` is published to npm and is
 > built against the same `@midnight-ntwrk/compact-runtime@0.16.0` the family
 > pins, so the dependency graph resolves a single shared runtime instance for
 > both packages. The manifest is strictly
