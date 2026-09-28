@@ -34,10 +34,12 @@ follows from `main` once the rc line is verified):
 npm install @midnight-ntwrk/midnight-vc-passport@rc
 ```
 
-> **Live version:** the first published release candidate is
-> `0.1.0-rc1` (under the `rc` dist-tag; `latest` stays untouched until the
-> stable release). The exact live version is recorded here after the first
-> publication dispatch — see the
+> **Live version:** nothing is on npmjs yet. The latest release candidate
+> is `0.1.0-rc2`, distributed through its
+> [GitHub Release](https://github.com/midnightntwrk/midnight-vc-passport/releases/tag/v0.1.0-rc2)
+> (see the interim install section below). Once npmjs publication succeeds,
+> the rc line is served under the `rc` dist-tag and `latest` stays untouched
+> until the stable release — see the
 > [publication runbook](docs/guides/npmjs-publication.md) for the release
 > train (channels, branch rules, dist-tags, trusted publishing, and
 > rollback).
