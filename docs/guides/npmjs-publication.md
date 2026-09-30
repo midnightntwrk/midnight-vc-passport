@@ -278,6 +278,14 @@ then-best-effort guard reported the attempt as a tolerated failure — it was
 (`rc=0.1.0-rc4`, `latest=0.1.0-rc3`). These timings motivated the 300s/30s
 convergence gate and the mandatory publication model.
 
+v0.1.0-rc5
+([run 36713241182](https://github.com/midnightntwrk/midnight-vc-passport/actions/runs/36713241182),
+2026-09-30, `develop` at `394ee8e`) validated the mandatory path end to end
+and was **Verified**. It was Accepted at 12:12:49Z and Visible after 91s
+(three E404 polls, then integrity and `rc` matched). `latest` stayed at
+`0.1.0-rc3`, the registry consumer install passed on its first attempt, and
+no GitHub Release was created.
+
 ## Incident response
 
 1. **Suspected publishing-identity compromise:** there is no token to revoke —

@@ -29,6 +29,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Fifth release candidate: **`v0.1.0-rc5`** dispatched on `develop` at
+  `394ee8e` (channel `rc`, `rc_index=5`,
+  [run 36713241182](https://github.com/midnightntwrk/midnight-vc-passport/actions/runs/36713241182)),
+  the first run of the mandatory npmjs publication path and its end-to-end
+  validation. It was **Verified**: `npm publish` was Accepted at 12:12:49Z,
+  the version became Visible (payload integrity matched, `rc` resolved to it)
+  after 91 seconds of the 300-second convergence budget, the dist-tag check
+  confirmed `latest` unchanged at `0.1.0-rc3`, and the clean registry install
+  of the exact tarball URL passed on its first attempt. No GitHub Release was
+  created.
+
 - Fourth release candidate: **`v0.1.0-rc4`** dispatched on `develop` at
   `cb916ad` (channel `rc`, `rc_index=4`,
   [run 36700635993](https://github.com/midnightntwrk/midnight-vc-passport/actions/runs/36700635993)),
