@@ -1390,8 +1390,8 @@ test("test-release-package-consumers: registry mode installs the exact tarball U
     const [{ cwd, env, specs, npmrc }] = seen;
     assert.deepEqual(specs, [TARBALL_URL, "@midnight-ntwrk/midnight-js-network-id"]);
     assert.equal(env.npm_config_prefer_offline, "false");
-    assert.match(npmrc, new RegExp(`store-dir=${env.npm_config_store_dir}`, "u"));
-    assert.match(npmrc, new RegExp(`cache-dir=${env.npm_config_cache_dir}`, "u"));
+    assert.ok(npmrc.split("\n").includes(`store-dir=${env.npm_config_store_dir}`), npmrc);
+    assert.ok(npmrc.split("\n").includes(`cache-dir=${env.npm_config_cache_dir}`), npmrc);
     assert.match(npmrc, /prefer-offline=false/u);
     // Removed in finally.
     for (const dir of [cwd, env.npm_config_store_dir, env.npm_config_cache_dir]) {
@@ -1881,7 +1881,7 @@ test("publish workflow summary: classifies every outcome combination", () => {
   for (const [outcomes, expected, detail] of cases) {
     const text = runSummary(outcomes);
     const label = outcomes.join("/");
-    assert.match(text, new RegExp(`outcome: \\*\\*${expected}\\*\\*`, "u"), label);
+    assert.ok(text.includes(`outcome: **${expected}**`), `${label}: ${text}`);
     assert.match(text, detail, label);
     if (expected === "Verified") {
       assert.doesNotMatch(text, /Before retrying/u, label);
