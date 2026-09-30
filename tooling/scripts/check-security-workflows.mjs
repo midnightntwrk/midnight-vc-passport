@@ -96,18 +96,16 @@ const assertCheckoutsDoNotPersistCredentials = (workflow, relativePath) => {
 const PUBLISH_REGISTRY = "https://registry.npmjs.org/";
 
 /**
- * Dedicated assertions for the publication workflow (npm-publication +
- * github-release-distribution specs): dispatch-only trigger, channel/branch
- * gate present, npm CLI trusted-publishing floor checked, registry locked to
- * the public npmjs registry, the protected npm-release environment, zero
- * npm-token references, and — WINDOW (temporary) — the operator `tag` input,
- * the tag reconciliation before any build step, the GitHub-Release steps
- * ahead of a best-effort npm publish, and the exact window permission grant
- * (contents: write, id-token: write, attestations: write). Returns the list
- * of violations (prefixed with `relativePath`); exported so the
- * release-tooling tests can exercise mutated copies of the workflow. The
- * window-exit change restores the registry-only shape (contents: read +
- * id-token: write, no tag input, no Release steps, fail-closed publish).
+ * Dedicated assertions for the publication workflow (npm-publication spec):
+ * dispatch-only trigger, channel/branch gate present, npm CLI
+ * trusted-publishing floor checked, registry locked to the public npmjs
+ * registry, the protected npm-release environment, zero npm-token
+ * references, exactly contents: read + id-token: write, and mandatory
+ * publication — no continue-on-error, no registry step conditioned on the
+ * publish outcome, no `tag` input, and no GitHub-Release creation, upload,
+ * or attestation step. Returns the list of violations (prefixed with
+ * `relativePath`); exported so the release-tooling tests can exercise
+ * mutated copies of the workflow.
  */
 export const assertPublishWorkflow = (workflow, relativePath) => {
   const violations = [];
@@ -149,71 +147,22 @@ export const assertPublishWorkflow = (workflow, relativePath) => {
     );
   }
 
-  // WINDOW (temporary): the operator-owned release tag is a required input.
-  const tagInput = events.workflow_dispatch?.inputs?.tag;
-  if (tagInput?.required !== true || tagInput?.type !== "string") {
-    violations.push(
-      "workflow_dispatch must declare the required string input 'tag' (the operator-created release tag)",
-    );
+  // The GitHub-Release window has exited: no operator `tag` input, and no
+  // step may create, upload to, or attest a GitHub Release.
+  if (events.workflow_dispatch?.inputs?.tag !== undefined) {
+    violations.push("workflow_dispatch must not declare a 'tag' input (npmjs is the only channel)");
   }
-
-  // WINDOW (temporary): the operator-tag reconciliation must run before any
-  // build step (setup or the repository gate) so tag drift fails the run
-  // within seconds.
-  const stepIndex = (steps, predicate) => steps.findIndex(predicate);
-  const runIncludes = (needle) => (step) =>
-    typeof step.run === "string" && step.run.includes(needle);
-  const usesIncludes = (needle) => (step) =>
-    typeof step.uses === "string" && step.uses.includes(needle);
-  const reconcilePresent = Object.values(workflow.jobs ?? {}).some(
-    (job) => stepIndex(job.steps ?? [], runIncludes("verify-release-tag.mjs")) !== -1,
-  );
-  if (!reconcilePresent) {
-    violations.push(
-      "must reconcile the operator release tag (verify-release-tag.mjs) in a step",
-    );
+  if (JSON.stringify(workflow).includes("inputs.tag")) {
+    violations.push("must not reference inputs.tag");
   }
   for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
-    const steps = job.steps ?? [];
-    const reconcile = stepIndex(steps, runIncludes("verify-release-tag.mjs"));
-    if (reconcile === -1) {
-      continue;
-    }
-    const setupIndex = stepIndex(steps, usesIncludes("setup-node-pnpm"));
-    const gateRunIndex = stepIndex(steps, runIncludes("pnpm run all"));
-    if (setupIndex !== -1 && reconcile > setupIndex) {
-      violations.push(`job ${jobName} must reconcile the release tag before tool setup`);
-    }
-    if (gateRunIndex !== -1 && reconcile > gateRunIndex) {
-      violations.push(`job ${jobName} must reconcile the release tag before the repository gate`);
-    }
-  }
-
-  // WINDOW (temporary): the GitHub-Release steps — checksums/body, create +
-  // digest verification, provenance attestation, release-URL consumer test —
-  // must all be present and precede the best-effort npm publish, so the
-  // Release is produced whatever the npm outcome.
-  const releaseSteps = [
-    ["publish-github-release.mjs prepare", runIncludes("publish-github-release.mjs prepare")],
-    ["publish-github-release.mjs publish", runIncludes("publish-github-release.mjs publish")],
-    ["actions/attest-build-provenance", usesIncludes("actions/attest-build-provenance@")],
-    ["test-release-package-consumers.mjs --release-url", runIncludes("--release-url")],
-  ];
-  for (const [label, predicate] of releaseSteps) {
-    const hosts = Object.entries(workflow.jobs ?? {}).filter(
-      ([, job]) => stepIndex(job.steps ?? [], predicate) !== -1,
-    );
-    if (hosts.length === 0) {
-      violations.push(`must run the GitHub-Release step '${label}'`);
-      continue;
-    }
-    for (const [jobName, job] of hosts) {
-      const steps = job.steps ?? [];
-      const publishIndex = stepIndex(steps, runIncludes("publish-npm-packages.sh"));
-      if (publishIndex !== -1 && stepIndex(steps, predicate) > publishIndex) {
-        violations.push(
-          `job ${jobName} must run the GitHub-Release step '${label}' before the npm publish`,
-        );
+    for (const step of job.steps ?? []) {
+      const label = `job ${jobName} step '${step.name ?? "<unnamed>"}'`;
+      if (typeof step.uses === "string" && step.uses.includes("actions/attest-build-provenance@")) {
+        violations.push(`${label} must not attest GitHub-Release assets (actions/attest-build-provenance)`);
+      }
+      if (typeof step.run === "string" && /\bgh release\b|publish-github-release/u.test(step.run)) {
+        violations.push(`${label} must not create or upload a GitHub Release (gh release / publish-github-release)`);
       }
     }
   }
@@ -261,49 +210,48 @@ export const assertPublishWorkflow = (workflow, relativePath) => {
         `the npm publish job must declare environment: npm-release (got '${job.environment}')`,
       );
     }
-    // WINDOW (temporary): the npm publish is best-effort (id: publish,
-    // continue-on-error), and every downstream registry step runs only when
-    // it succeeded.
+    // Mandatory publication: nothing is best-effort, and no step after the
+    // publish is conditioned on its outcome (GitHub's default — run only
+    // when every previous step succeeded — is the contract).
     const steps = job.steps ?? [];
-    const publishStep = steps.find(runIncludes("publish-npm-packages.sh"));
-    if (publishStep.id !== "publish" || publishStep["continue-on-error"] !== true) {
-      violations.push(
-        "the npm publish step must be best-effort during the window (id: publish, continue-on-error: true)",
-      );
-    }
-    const registrySteps = steps.filter(
-      (step) =>
-        typeof step.run === "string" &&
-        (step.run.includes("wait-for-npm-packages.mjs") ||
-          (step.run.includes("npm-release-state.mjs") && step.run.includes("--verify")) ||
-          (step.run.includes("test-release-package-consumers.mjs") &&
-            step.run.includes("--registry"))),
+    const publishIndex = steps.findIndex(
+      (step) => typeof step.run === "string" && step.run.includes("publish-npm-packages.sh"),
     );
-    for (const step of registrySteps) {
-      if (step.if !== "steps.publish.outcome == 'success'") {
+    if (steps[publishIndex].id !== "publish") {
+      violations.push("the npm publish step must carry id: publish (the summary classifies from it)");
+    }
+    for (const step of steps) {
+      if (step["continue-on-error"] !== undefined) {
         violations.push(
-          `registry step '${step.name ?? "<unnamed>"}' must run only if steps.publish.outcome == 'success'`,
+          `step '${step.name ?? "<unnamed>"}' must not carry continue-on-error (publication is mandatory)`,
+        );
+      }
+    }
+    for (const step of steps.slice(publishIndex + 1)) {
+      if (typeof step.if === "string" && step.if.includes("steps.publish.outcome")) {
+        violations.push(
+          `step '${step.name ?? "<unnamed>"}' must not be conditioned on steps.publish.outcome`,
         );
       }
     }
   }
-  // WINDOW (temporary) least-privilege permissions: exactly what the GitHub
-  // release (contents: write), its provenance attestations (attestations:
-  // write), and the OIDC identity for npm trusted publishing and attestation
-  // signing (id-token: write) need. The window-exit change restores the
-  // contents: read + id-token: write shape.
+  // Least-privilege permissions, at workflow and job level: exactly
+  // contents: read (checkout) and id-token: write (the OIDC identity for npm
+  // trusted publishing and the provenance signer).
+  const exactGrant = (permissions) => {
+    const grant = permissions ?? {};
+    return (
+      Object.keys(grant).length === 2 &&
+      grant.contents === "read" &&
+      grant["id-token"] === "write"
+    );
+  };
+  if (!exactGrant(workflow.permissions)) {
+    violations.push("workflow permissions must grant exactly contents: read and id-token: write");
+  }
   for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
-    const permissions = job.permissions ?? {};
-    const permissionKeys = Object.keys(permissions);
-    if (
-      permissionKeys.length !== 3 ||
-      permissions.contents !== "write" ||
-      permissions["id-token"] !== "write" ||
-      permissions.attestations !== "write"
-    ) {
-      violations.push(
-        `job ${jobName} must grant exactly contents: write, id-token: write, and attestations: write`,
-      );
+    if (!exactGrant(job.permissions)) {
+      violations.push(`job ${jobName} must grant exactly contents: read and id-token: write`);
     }
   }
 
@@ -492,7 +440,7 @@ const main = () => {
   }
 
   console.log(
-    "Security workflow contract is valid: branch coverage, dedicated Scorecard publication, public dependency review, Dependabot, immutable action refs, checkout credential hygiene, and the publication workflow contract (dispatch-only trigger, channel gate, tag reconciliation, GitHub-Release steps before a best-effort npm publish, npm CLI trusted-publishing floor, locked npmjs registry, protected npm-release environment, zero token references, window permissions: contents write + id-token write + attestations write).",
+    "Security workflow contract is valid: branch coverage, dedicated Scorecard publication, public dependency review, Dependabot, immutable action refs, checkout credential hygiene, and the publication workflow contract (dispatch-only trigger, channel gate, npm CLI trusted-publishing floor, locked npmjs registry, protected npm-release environment, zero token references, mandatory publication with no best-effort or outcome-guarded steps, no GitHub-Release path, permissions: contents read + id-token write).",
   );
 };
 

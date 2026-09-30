@@ -12,6 +12,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Notes
+
+- Distribution is npmjs-only from the next version: install
+  `@midnight-ntwrk/midnight-vc-passport` from npmjs (see the package README).
+  No new versions are attached to GitHub Releases; the rc2–rc4 Release
+  tarballs stay at their existing URLs.
+
+## [0.1.0-rc4] - 2026-09-30
+
+Fourth release candidate of the `0.1.0` line, and the first published to
+npmjs by the release workflow: `npm publish` was **Accepted** under the `rc`
+dist-tag and the version became **Visible** about four minutes later
+(`npm install @midnight-ntwrk/midnight-vc-passport@0.1.0-rc4`). It was also
+attached to the last interim
+[GitHub Release](https://github.com/midnightntwrk/midnight-vc-passport/releases/tag/v0.1.0-rc4).
+
+### Notes
+
+- No package-source changes since [`0.1.0-rc3`](#010-rc3---2026-09-30): this
+  candidate re-cuts the same contents.
+
 ## [0.1.0-rc3] - 2026-09-30
 
 Third release candidate of the `0.1.0` line, published through the interim

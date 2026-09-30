@@ -262,54 +262,30 @@ with the `npm-artifacts-contents` flake check guarding the tarball contents
 (dist output, compact sources, scripts, no managed source maps, version
 consistency).
 
-## Installing from GitHub Releases (interim)
+## Installing from npmjs
 
-While the npmjs Trusted Publisher mapping is not configured (see the
-[publication runbook](../../docs/guides/npmjs-publication.md#github-release-distribution-window)),
-every `rc`/`release` publication is also published as a GitHub Release
-carrying the packed tarball, a `SHA256SUMS` file, the SPDX SBOM, the
-package-contract report, and build-provenance attestations. Any downstream
-repository can consume it without waiting for the registry: pin the
-**versioned** release-download URL directly in your manifest's
-`dependencies`:
-
-```json
-{
-  "dependencies": {
-    "@midnight-ntwrk/midnight-vc-passport": "https://github.com/midnightntwrk/midnight-vc-passport/releases/download/v0.1.0-rc3/midnight-ntwrk-midnight-vc-passport-0.1.0-rc3.tgz"
-  }
-}
-```
-
-The URL pattern is
-`https://github.com/midnightntwrk/midnight-vc-passport/releases/download/v<version>/midnight-ntwrk-midnight-vc-passport-<version>.tgz`.
-Then `npm install` / `pnpm install` as usual: the tarball's transitive
-dependencies resolve from the public npmjs registry, and your **lockfile
-freezes the URL** — installs are reproducible and never silently move. To
-upgrade, edit the URL to the newer release (a one-line change) and refresh
-the lockfile. Always pin a versioned URL; there is deliberately no
-unversioned "latest" convenience URL, so a pinned version can never jump
-underneath you.
-
-Notes for consumer tooling:
-
-- A direct URL dependency is a **first-class dependency**, not an exotic
-  *sub*dependency — no `blockExoticSubdeps`-style exemption is needed for it.
-- A URL dependency carries **no registry publish date**, so registry
-  release-age floors (`minimumReleaseAge`-style policies) do not apply to it.
-
-Optional verification (offered, not mandated) after downloading the assets
-of a release:
+Install the release-candidate line from npmjs (the first stable `0.1.0`
+follows from `main` once the rc line is verified):
 
 ```sh
-sha256sum --check SHA256SUMS   # checksums for every release asset
-gh attestation verify --repo midnightntwrk/midnight-vc-passport \
-  midnight-ntwrk-midnight-vc-passport-0.1.0-rc3.tgz
+npm install @midnight-ntwrk/midnight-vc-passport@rc
+# or pin an exact version
+npm install @midnight-ntwrk/midnight-vc-passport@0.1.0-rc4
 ```
 
-This channel is interim: once npmjs publication succeeds, the usual
-`npm install @midnight-ntwrk/midnight-vc-passport` flow becomes the only
-documented path, and pinned release URLs keep working until you migrate.
+Release candidates are served under the `rc` dist-tag. Until the first stable
+release, `latest` resolves to `0.1.0-rc3` (npmjs assigns `latest` to a
+package's first-ever version), so install with `@rc` or an exact version to
+get the newest candidate. See the
+[publication runbook](../../docs/guides/npmjs-publication.md) for the release
+train (channels, branch rules, dist-tags, trusted publishing, and rollback).
+
+> **Earlier GitHub Release tarballs:** `0.1.0-rc2`–`0.1.0-rc4` were also
+> attached to GitHub Releases during an interim distribution window; those
+> tarballs stay available at their existing URLs
+> (`https://github.com/midnightntwrk/midnight-vc-passport/releases/download/v<version>/midnight-ntwrk-midnight-vc-passport-<version>.tgz`),
+> but no new versions are attached to GitHub Releases. To upgrade a pinned
+> URL dependency, replace it with the npmjs version above.
 
 ## Related docs
 

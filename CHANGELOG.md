@@ -7,7 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING (release process):** npmjs publication is mandatory and the
+  GitHub-Release distribution window has ended. A green publish run now
+  means the version is **Verified** (see `CONTEXT.md`): `continue-on-error`
+  and every publish-outcome guard are gone; a single convergence gate polls
+  every 30s for at most 300s and requires the registry payload to match the
+  packed tarball (integrity, then a content comparison); `npm publish` runs
+  once and is never retried; the registry consumer test installs the exact
+  `dist.tarball` URL with a run-private pnpm store and cache (3 attempts,
+  10s apart); and the always-run summary reports Rejected, Accepted
+  (propagation timed out), Visible (verification failed), or Verified with
+  retry guidance. The `tag` input, operator-tag reconciliation, GitHub
+  Release creation/attestation, and the release-URL consumer mode are
+  removed, the workflow permissions are back to `contents: read` +
+  `id-token: write`, and `snapshot` is available again from `develop`. The
+  security-workflow self-check now forbids reintroducing any of the window
+  shape. The rc2–rc4 GitHub Releases stay in place, but no new versions are
+  attached to GitHub Releases.
+
 ### Added
+
+- Fourth release candidate: **`v0.1.0-rc4`** dispatched on `develop` at
+  `cb916ad` (channel `rc`, `rc_index=4`,
+  [run 36700635993](https://github.com/midnightntwrk/midnight-vc-passport/actions/runs/36700635993)),
+  the last GitHub-Release window release and the first run of the workflow
+  whose npmjs publication went through Trusted Publishing. The
+  [prerelease](https://github.com/midnightntwrk/midnight-vc-passport/releases/tag/v0.1.0-rc4)
+  was created as before. On npmjs, `npm publish` was **Accepted** at about
+  10:10:21Z and the version became **Visible** about four minutes later
+  (version and dist-tags by about 10:14:43Z, install packument by about
+  10:16:56Z). The publish script's 60-second read-back timed out first, and
+  the best-effort guard reported a tolerated failure that was not an
+  authentication rejection and skipped the registry checks (issue #17). The
+  registry now serves `rc=0.1.0-rc4` and `latest=0.1.0-rc3`.
 
 - Third release candidate: **`v0.1.0-rc3`** dispatched on `develop` at
   `cb916ad` (channel `rc`, `rc_index=3`,
@@ -34,7 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   best-effort npmjs publication failed with `E404` (Trusted Publisher
   mapping not yet configured) and was tolerated as designed; the window's
   exit condition lives in the
-  [publication runbook](docs/guides/npmjs-publication.md#window-exit-condition).
+  [publication runbook](docs/guides/npmjs-publication.md#github-release-distribution-window-ended).
 
 - First bridge release: **`v0.1.0-rc1`** dispatched on `develop` (channel
   `rc`, [run 33615405618](https://github.com/midnightntwrk/midnight-verifiable-credential-digital-passport/actions/runs/33615405618))
