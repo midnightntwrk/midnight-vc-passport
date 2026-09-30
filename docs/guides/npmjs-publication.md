@@ -21,7 +21,9 @@ publish step — is validate the channel/branch gate
 Versioning is **stateless**: the base semver (`0.1.0`) lives in the root and
 package manifests (they must agree, and the workflow fails if they don't); the
 workflow stamps the channel version only into its ephemeral checkout. Nothing
-is committed, tagged, or pushed by a publication.
+is committed, tagged, or pushed by a publication; the operator tags the
+release commit afterwards (see
+[Tag the release commit](#tag-the-release-commit)).
 
 > **Authentication is npm Trusted Publishing (OIDC).** There is **no npm
 > token** — no `MIDNIGHTCI_NPMJS_TOKEN`, no `NODE_AUTH_TOKEN`, nothing to
@@ -152,7 +154,8 @@ Before dispatching any publication, verify:
    - **Version:** the manifest base, e.g. `0.1.0` (optional confirmation)
    - **rc_index:** e.g. `5` (rc channel only; defaults to 1)
 
-   There is no tag input: a publication creates no git ref.
+   There is no tag input: the run creates no git ref. The tag is pushed
+   after the run is Verified (step 6).
 3. Approve the run when the `npm-release` environment's reviewer prompt
    arrives.
 4. Watch the run. Expected sequence: context resolution → tool setup → npm
@@ -163,6 +166,8 @@ Before dispatching any publication, verify:
    → **dist-tags** → **registry-test** → summary.
 5. Read the outcome at the top of the run summary (see below), then record
    the release in the root and package changelogs.
+6. For a Verified `rc` or `release` run,
+   [tag the release commit](#tag-the-release-commit).
 
 ## Post-publication verification
 
@@ -224,6 +229,36 @@ every later `rc` and `snapshot` publication (the dist-tag check requires it
 to stay unchanged) until the first `release` dispatch of `0.1.0` moves it.
 Do not "repair" it before then: it is the expected state, and moving it
 requires registry authority the pipeline does not have.
+
+### Tag the release commit
+
+After a **Verified** `rc` or `release` run, tag the commit it was built from
+as `v<version>` (for example `v0.1.0-rc5`), so the release can be found and
+diffed in git. `snapshot` versions are not tagged.
+
+Take the commit from the version's npm provenance attestation, not from the
+branch head, which may have moved since the dispatch:
+
+```sh
+VERSION=0.1.0-rc5
+COMMIT="$(curl -s "https://registry.npmjs.org/-/npm/v1/attestations/@midnight-ntwrk%2fmidnight-vc-passport@${VERSION}" \
+  | jq -r '.attestations[] | select(.predicateType | test("slsa")) | .bundle.dsseEnvelope.payload' \
+  | base64 -d | jq -r '.predicate.buildDefinition.resolvedDependencies[0].digest.gitCommit')"
+git fetch origin && git cat-file -e "${COMMIT}^{commit}"   # the commit must exist
+git tag -a "v${VERSION}" "${COMMIT}" -m "v${VERSION} (<ordinal> release candidate)"
+git push origin "v${VERSION}"
+```
+
+- Tags are annotated; use `-m "v<version>"` for a stable release.
+- Two versions cut from the same commit get two tags on it. For example,
+  `v0.1.0-rc3` and `v0.1.0-rc4` are both on `cb916ad`.
+- Never move or delete a pushed release tag. If one is wrong, escalate
+  rather than force-pushing.
+- The tag is for navigation, not authority: the provenance attestation is
+  the signed record of the source commit. The workflow does not push tags
+  itself, because that would need `contents: write` in the publish job
+  (tracked with the job split in #18).
+- Tags are not GitHub Releases: no new Releases are created.
 
 ## Retry and rollback
 
