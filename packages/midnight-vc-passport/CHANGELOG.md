@@ -12,6 +12,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0-rc3] - 2026-09-30
+
+Third release candidate of the `0.1.0` line, published through the interim
+[GitHub-Release distribution window](https://github.com/midnightntwrk/midnight-vc-passport/releases/tag/v0.1.0-rc3)
+while the npmjs Trusted Publisher mapping is pending: install by the
+versioned release URL pinned in the package README. The release carries the
+tarball, `SHA256SUMS`, the SPDX SBOM, the contract report, and
+build-provenance attestations for every asset.
+
+### Notes
+
+- No package-source changes since [`0.1.0-rc2`](#010-rc2---2026-09-28): this
+  candidate re-cuts the same contents (repository/tooling documentation and
+  openspec sync only).
+
 ## [0.1.0-rc2] - 2026-09-28
 
 Second release candidate of the `0.1.0` line, published through the interim

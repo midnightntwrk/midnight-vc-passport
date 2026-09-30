@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Third release candidate: **`v0.1.0-rc3`** dispatched on `develop` at
+  `cb916ad` (channel `rc`, `rc_index=3`,
+  [run 36692150763](https://github.com/midnightntwrk/midnight-vc-passport/actions/runs/36692150763)).
+  Documentation and openspec-sync only since rc2 (no package source changes;
+  the tarball is the rc2 contents re-cut). The
+  [prerelease](https://github.com/midnightntwrk/midnight-vc-passport/releases/tag/v0.1.0-rc3)
+  (never latest) carries the contract-checked tarball, `SHA256SUMS`, the SPDX
+  SBOM, and the package-contract report; every uploaded digest matched the
+  packed artifact, the release-URL consumer round-trip passed, and the
+  tarball's build-provenance attestation verified via `gh attestation
+  verify`. The best-effort npmjs publication again failed with `E404` (the
+  Trusted Publisher mapping is still not configured) and was tolerated as
+  designed.
+
 - First GitHub-Release distribution window release: **`v0.1.0-rc2`**
   dispatched on `develop` at `e4b5160` (channel `rc`, `rc_index=2`,
   [run 36428782614](https://github.com/midnightntwrk/midnight-vc-passport/actions/runs/36428782614)). The
