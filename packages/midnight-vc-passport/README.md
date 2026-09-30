@@ -276,7 +276,7 @@ repository can consume it without waiting for the registry: pin the
 ```json
 {
   "dependencies": {
-    "@midnight-ntwrk/midnight-vc-passport": "https://github.com/midnightntwrk/midnight-vc-passport/releases/download/v0.1.0-rc2/midnight-ntwrk-midnight-vc-passport-0.1.0-rc2.tgz"
+    "@midnight-ntwrk/midnight-vc-passport": "https://github.com/midnightntwrk/midnight-vc-passport/releases/download/v0.1.0-rc3/midnight-ntwrk-midnight-vc-passport-0.1.0-rc3.tgz"
   }
 }
 ```
@@ -304,7 +304,7 @@ of a release:
 ```sh
 sha256sum --check SHA256SUMS   # checksums for every release asset
 gh attestation verify --repo midnightntwrk/midnight-vc-passport \
-  midnight-ntwrk-midnight-vc-passport-0.1.0-rc2.tgz
+  midnight-ntwrk-midnight-vc-passport-0.1.0-rc3.tgz
 ```
 
 This channel is interim: once npmjs publication succeeds, the usual
