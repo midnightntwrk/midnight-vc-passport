@@ -270,7 +270,7 @@ follows from `main` once the rc line is verified):
 ```sh
 npm install @midnight-ntwrk/midnight-vc-passport@rc
 # or pin an exact version
-npm install @midnight-ntwrk/midnight-vc-passport@0.1.0-rc4
+npm install @midnight-ntwrk/midnight-vc-passport@0.1.0-rc5
 ```
 
 Release candidates are served under the `rc` dist-tag. Until the first stable

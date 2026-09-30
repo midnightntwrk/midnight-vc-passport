@@ -45,4 +45,4 @@
 ## 8. Integration
 
 - [x] 8.1 Run `pnpm run all` and `openspec validate require-npmjs-publication --strict`, and verify both pass.
-- [ ] 8.2 After merge to `develop`, dispatch `publish.yml` with `channel: rc`, `version: 0.1.0`, `rc_index: 5`. Verify that the run summary reports **Verified**, `rc=0.1.0-rc5`, `latest` unchanged at `0.1.0-rc3`, and that no GitHub Release was created. Record the run link in the runbook/changelog.
+- [x] 8.2 After merge to `develop`, dispatch `publish.yml` with `channel: rc`, `version: 0.1.0`, `rc_index: 5`. Verify that the run summary reports **Verified**, `rc=0.1.0-rc5`, `latest` unchanged at `0.1.0-rc3`, and that no GitHub Release was created. Record the run link in the runbook/changelog.
