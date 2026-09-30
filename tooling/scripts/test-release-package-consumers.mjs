@@ -15,7 +15,7 @@
 // limitations under the License.
 
 // Clean-consumer installation tests (npm-publication: "Pre-publication gate"
-// and "Post-publication registry verification"). Ported from
+// and "Verified post-publication registry checks"). Ported from
 // midnight-verifiable-credentials; the consumer evidence reuses this
 // repository's existing smoke round-trip
 // (packages/smoke-consumer/scripts/round-trip.mjs) instead of VC's fixture
@@ -30,21 +30,15 @@
 //
 //   registry mode:
 //     node tooling/scripts/test-release-package-consumers.mjs --registry <url> --version <version>
-//     Install the published version — and its transitive dependencies — from
-//     the public registry and run the same round-trip.
-//
-//   release-url mode (github-release-distribution: "Release-URL consumer
-//   verification"; WINDOW temporary):
-//     node tooling/scripts/test-release-package-consumers.mjs --release-url <url>
-//     Install the package from the versioned release-download URL of the
-//     just-published GitHub release — dependencies resolve from the public
-//     npmjs registry — and run the same round-trip. This is the exact install
-//     path documented for window consumers (a direct URL dependency pinned in
-//     the manifest), proving the real distribution channel end-to-end. https
-//     is required; plain http is accepted only for localhost test harnesses.
+//     Resolve the exact tarball the registry serves for the published version
+//     (`npm view … dist.tarball --prefer-online`), install that URL in a clean
+//     project with a run-private pnpm store and cache (so no metadata cached
+//     before the publication can be consulted) and dependencies resolved from
+//     the public registry, and run the same round-trip. The install is
+//     attempted at most 3 times, 10 seconds apart.
 
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -62,11 +56,11 @@ const NETWORK_ID = "@midnight-ntwrk/midnight-js-network-id";
 
 const SEMVER = /^\d+\.\d+\.\d+(-[\w.-]+)?$/u;
 
-// Test hook: the round-trip runner can be swapped (offline tooling tests
-// exercise the release-url harness against a local HTTP server). Unset in CI,
-// where the real smoke round-trip runs.
-const ROUND_TRIP = process.env.RELEASE_CONSUMER_ROUND_TRIP
-  ?? path.join(repoRoot, "packages/smoke-consumer/scripts/round-trip.mjs");
+const ROUND_TRIP = path.join(repoRoot, "packages/smoke-consumer/scripts/round-trip.mjs");
+
+/** Registry-mode install budget (design D5): 3 attempts, 10 seconds apart. */
+export const REGISTRY_INSTALL_ATTEMPTS = 3;
+export const REGISTRY_INSTALL_DELAY_MS = 10_000;
 
 const fail = (message) => {
   console.error(`[test-release-package-consumers] ${message}`);
@@ -105,7 +99,7 @@ const run = (cmd, args, options = {}) => {
 
 /** Argument validation shared by the entry styles (covered by tooling tests). */
 export const parseConsumerArgs = (argv) => {
-  const options = { registry: null, version: null, artifactsDir: null, releaseUrl: null, mode: "tarball" };
+  const options = { registry: null, version: null, artifactsDir: null, mode: "tarball" };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--registry") {
@@ -114,35 +108,9 @@ export const parseConsumerArgs = (argv) => {
       options.version = argv[++index];
     } else if (arg === "--artifacts-dir") {
       options.artifactsDir = argv[++index];
-    } else if (arg === "--release-url") {
-      options.releaseUrl = argv[++index];
     } else {
       throw new Error(`unknown argument ${arg}`);
     }
-  }
-  if (options.releaseUrl !== null) {
-    if (options.registry !== null || options.version !== null || options.artifactsDir !== null) {
-      throw new Error("--release-url cannot be combined with --registry/--version/--artifacts-dir");
-    }
-    let parsed;
-    try {
-      parsed = new URL(options.releaseUrl);
-    } catch {
-      throw new Error(`--release-url must be a URL (got ${options.releaseUrl})`);
-    }
-    if (
-      parsed.protocol !== "https:" &&
-      !(parsed.protocol === "http:" && /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/u.test(parsed.host))
-    ) {
-      throw new Error(
-        `--release-url must be an https release-download URL (http is only accepted for localhost test harnesses; got ${options.releaseUrl})`,
-      );
-    }
-    if (!parsed.pathname.endsWith(".tgz")) {
-      throw new Error(`--release-url must point at a packed .tgz asset (got ${options.releaseUrl})`);
-    }
-    options.mode = "release-url";
-    return options;
   }
   if (options.registry !== null || options.version !== null) {
     if (options.registry === null || options.version === null) {
@@ -275,41 +243,103 @@ const testTarball = async (tarball) => {
   }
 };
 
-const testRegistry = (registry, version) => {
-  const isolated = cleanProject();
-  console.log(`registry consumer: clean project at ${isolated}`);
+/** Resolves the exact tarball URL the registry serves, bypassing local metadata caches. */
+const resolveTarballUrl = (registry, version) => {
+  const result = run("npm", [
+    "view",
+    `${FAMILY}@${version}`,
+    "dist.tarball",
+    "--json",
+    "--prefer-online",
+    "--registry",
+    registry,
+  ]);
+  let url;
   try {
-    console.log(`registry consumer: installing ${FAMILY}@${version} from ${registry}`);
-    run(
-      "pnpm",
-      ["add", "--registry", registry, `${FAMILY}@${version}`, NETWORK_ID],
-      { cwd: isolated },
-    );
-    consumerRoundTrip(isolated, { label: "registry consumer" });
-    console.log(`registry consumer: PASS for ${FAMILY}@${version}`);
-  } finally {
-    rmSync(isolated, { recursive: true, force: true });
+    url = JSON.parse(result.stdout);
+  } catch (error) {
+    throw new Error(`registry metadata for ${FAMILY}@${version} is not valid JSON (${error.message})`);
   }
+  if (typeof url !== "string" || !/^https:\/\//u.test(url)) {
+    throw new Error(`registry returned no https dist.tarball for ${FAMILY}@${version} (got ${JSON.stringify(url)})`);
+  }
+  return url;
 };
 
 /**
- * Release-url mode (WINDOW temporary): installs the package exactly the way
- * window consumers do — the versioned release-download URL pinned as a direct
- * dependency — with transitive dependencies resolved from the public npmjs
- * registry. Reuses the clean-project harness and the round-trip; the remote
- * tarball is fetched by pnpm itself into its content-addressed store (the
- * ENAMETOOLONG workaround is a local-path concern only).
+ * Points the clean project's pnpm at a run-private store and cache, and asks
+ * for fresh registry metadata. Returns the environment the install runs
+ * with: environment config outranks every .npmrc, so no ambient store/cache
+ * setting can re-route the install to a pre-seeded cache.
  */
-const testReleaseUrl = (releaseUrl) => {
+const privatePackageManagerState = (isolated, state) => {
+  const storeDir = path.join(state, "store");
+  const cacheDir = path.join(state, "cache");
+  mkdirSync(storeDir);
+  mkdirSync(cacheDir);
+  writeFileSync(
+    path.join(isolated, ".npmrc"),
+    `store-dir=${storeDir}\ncache-dir=${cacheDir}\nprefer-offline=false\n`,
+  );
+  const env = Object.fromEntries(
+    Object.entries(consumerEnv).filter(([key]) => !/^npm_config_(store_dir|cache_dir|prefer_offline|offline)$/iu.test(key)),
+  );
+  return {
+    storeDir,
+    cacheDir,
+    env: {
+      ...env,
+      npm_config_store_dir: storeDir,
+      npm_config_cache_dir: cacheDir,
+      npm_config_prefer_offline: "false",
+    },
+  };
+};
+
+const pnpmAdd = ({ cwd, env, specs }) => run("pnpm", ["add", ...specs], { cwd, env });
+
+/**
+ * Registry mode. The collaborators are injectable so tooling tests exercise
+ * the retry budget and cache isolation without the network.
+ */
+export const testRegistry = async (
+  registry,
+  version,
+  {
+    resolveUrl = resolveTarballUrl,
+    install = pnpmAdd,
+    roundTrip = (isolated) => consumerRoundTrip(isolated, { label: "registry consumer" }),
+    sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    attempts = REGISTRY_INSTALL_ATTEMPTS,
+    delayMs = REGISTRY_INSTALL_DELAY_MS,
+  } = {},
+) => {
   const isolated = cleanProject();
-  console.log(`release-url consumer: clean project at ${isolated}`);
+  const state = mkdtempSync(path.join(tmpdir(), "release-consumer-state-"));
+  console.log(`registry consumer: clean project at ${isolated}`);
   try {
-    console.log(`release-url consumer: installing ${releaseUrl}`);
-    run("pnpm", ["add", releaseUrl, NETWORK_ID], { cwd: isolated });
-    consumerRoundTrip(isolated, { label: "release-url consumer" });
-    console.log(`release-url consumer: PASS for ${releaseUrl}`);
+    const tarballUrl = resolveUrl(registry, version);
+    const { env } = privatePackageManagerState(isolated, state);
+    console.log(`registry consumer: installing ${tarballUrl} (${FAMILY}@${version}) with a run-private store and cache`);
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        await install({ cwd: isolated, env, specs: [tarballUrl, NETWORK_ID] });
+        break;
+      } catch (error) {
+        if (attempt >= attempts) {
+          throw new Error(`registry install failed after ${attempts} attempt(s): ${error.message}`);
+        }
+        console.error(
+          `registry consumer: install attempt ${attempt}/${attempts} failed (${error.message}); retrying in ${delayMs / 1000}s`,
+        );
+        await sleep(delayMs);
+      }
+    }
+    await roundTrip(isolated);
+    console.log(`registry consumer: PASS for ${FAMILY}@${version}`);
   } finally {
     rmSync(isolated, { recursive: true, force: true });
+    rmSync(state, { recursive: true, force: true });
   }
 };
 
@@ -326,12 +356,11 @@ const main = async () => {
   })();
 
   if (options.mode === "registry") {
-    testRegistry(options.registry, options.version);
-    return;
-  }
-
-  if (options.mode === "release-url") {
-    testReleaseUrl(options.releaseUrl);
+    try {
+      await testRegistry(options.registry, options.version);
+    } catch (error) {
+      fail(error.message);
+    }
     return;
   }
 
