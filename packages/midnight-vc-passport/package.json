@@ -93,8 +93,8 @@
     "all": "pnpm run compact && pnpm run build && pnpm run test:ci"
   },
   "dependencies": {
-    "@midnight-ntwrk/compact-runtime": "0.16.0",
-    "@midnight-ntwrk/credential-compact": "0.2.0-rc1"
+    "@midnight-ntwrk/compact-runtime": "0.20.0",
+    "@midnight-ntwrk/credential-compact": "0.3.0"
   },
   "devDependencies": {
     "@midnight-ntwrk/midnight-js-network-id": "4.1.1",
