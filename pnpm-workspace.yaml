@@ -32,7 +32,7 @@ trustPolicyExclude: []
 # 3.3.17. Dev-tooling scope only (postcss/vite chain); the publishable
 # manifest's registry-clean dependency policy is unaffected.
 overrides:
-  nanoid: 3.3.18
+  nanoid: 3.3.20
   # Advisory-driven transitive override: GHSA-2883-xcg3-v3hh (high) is patched
   # in js-yaml 4.3.2; the lockfile had resolved 4.3.1 (via eslint/espree).
   # 4.3.2 carries npm provenance attestations. Dev-tooling scope only.
