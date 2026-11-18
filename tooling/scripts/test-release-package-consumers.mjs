@@ -52,7 +52,7 @@ const repoRoot = path.resolve(
   "../..",
 );
 const FAMILY = "@midnight-ntwrk/midnight-vc-passport";
-const NETWORK_ID = "@midnight-ntwrk/midnight-js-network-id";
+const { packageManager } = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 
 const SEMVER = /^\d+\.\d+\.\d+(-[\w.-]+)?$/u;
 
@@ -129,7 +129,11 @@ export const parseConsumerArgs = (argv) => {
 
 /** Runs the round-trip in a clean project that has the family package installed. */
 const consumerRoundTrip = (isolated, { label }) => {
-  cpSync(ROUND_TRIP, path.join(isolated, "round-trip.mjs"));
+  for (const file of ["round-trip.mjs", "rc5-vector.json", "public-types.mts", "tsconfig.consumer.json"]) {
+    cpSync(path.join(path.dirname(ROUND_TRIP), file), path.join(isolated, file));
+  }
+  console.log(`${label}: checking public declarations (strict, skipLibCheck=false)`);
+  run("node", [path.join(repoRoot, "node_modules/typescript/bin/tsc"), "-p", "tsconfig.consumer.json"], { cwd: isolated });
   console.log(`${label}: running the issuance/presentation/verification round-trip`);
   run("node", ["round-trip.mjs"], { cwd: isolated });
 };
@@ -178,7 +182,7 @@ const cleanProject = () => {
         version: "0.0.0",
         private: true,
         type: "module",
-        packageManager: "pnpm@10.34.1",
+        packageManager,
       },
       null,
       2,
@@ -228,10 +232,7 @@ const testTarball = async (tarball) => {
     // the 255-byte filename limit with ERR_PNPM_ENAMETOOLONG.
     const tarballName = path.basename(tarball);
     cpSync(tarball, path.join(isolated, tarballName));
-    // The network-id helper the round-trip uses is a devDependency of the
-    // smoke workspace; install it alongside the tarball so the isolated
-    // project mirrors the smoke lane's resolution.
-    run("pnpm", ["add", `./${tarballName}`, NETWORK_ID], { cwd: isolated });
+    run("pnpm", ["add", `./${tarballName}`], { cwd: isolated });
     if (manifest.name === FAMILY) {
       consumerRoundTrip(isolated, { label: "tarball consumer" });
     } else {
@@ -323,7 +324,7 @@ export const testRegistry = async (
     console.log(`registry consumer: installing ${tarballUrl} (${FAMILY}@${version}) with a run-private store and cache`);
     for (let attempt = 1; ; attempt += 1) {
       try {
-        await install({ cwd: isolated, env, specs: [tarballUrl, NETWORK_ID] });
+        await install({ cwd: isolated, env, specs: [tarballUrl] });
         break;
       } catch (error) {
         if (attempt >= attempts) {

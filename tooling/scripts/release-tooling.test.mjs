@@ -1388,7 +1388,7 @@ test("test-release-package-consumers: registry mode installs the exact tarball U
     });
     assert.equal(seen.length, 1);
     const [{ cwd, env, specs, npmrc }] = seen;
-    assert.deepEqual(specs, [TARBALL_URL, "@midnight-ntwrk/midnight-js-network-id"]);
+    assert.deepEqual(specs, [TARBALL_URL]);
     assert.equal(env.npm_config_prefer_offline, "false");
     assert.ok(npmrc.split("\n").includes(`store-dir=${env.npm_config_store_dir}`), npmrc);
     assert.ok(npmrc.split("\n").includes(`cache-dir=${env.npm_config_cache_dir}`), npmrc);

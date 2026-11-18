@@ -64,15 +64,22 @@ and the published contract layer
 Compact-value wire codec is inlined into the family package (no dependency on
 the monorepo's openid transport package).
 
+## Ledger 9 migration
+
+This branch targets Ledger 9; the published `0.1.0-rc5` above is still the
+pre-upgrade package. See [generated API and persisted data](packages/midnight-vc-passport/README.md#ledger-9-migration)
+for async contextual calls, removed metadata, and what the fixed rc5 vectors
+establish. No Ledger 9 Passport release is implied by this branch.
+
 ## Development
 
 The reproducible toolchain lives in the Nix flake: Node.js 24, pnpm (via
 Corepack, honoring the `packageManager` pin), and the Compact compiler
-(**0.31.1**, identical to the CI pin) sourced from the
+(**0.36.0**, identical to the CI and publication pins). The flake selects
+hash-pinned [official compiler archives](https://github.com/midnightntwrk/compact/releases/tag/compactc-v0.36.0)
+and takes the Compact devtool and circuit parameters from the pinned
 [`MediaNoxLabs/flake-collection`](https://github.com/MediaNoxLabs/flake-collection)
-flake input — the same toolchain packaging the sibling repositories consume —
-plus Midnight circuit parameters from the same input, provided to the
-compiler through `MIDNIGHT_PP` for offline compilation.
+input. `MIDNIGHT_PP` points to the parameters for offline compilation.
 
 ```sh
 nix develop            # enter the dev shell (toolchain + circuit params ready)
@@ -98,23 +105,21 @@ The output is a flat directory containing one `.tgz` per publishable
 `midnight-ntwrk-midnight-vc-passport-0.1.0.tgz` —
 packed by the same `prepack` pipeline the CI smoke lane exercises (compact
 compile, TypeScript build, artifact copies). Dependencies resolve offline from
-a lockfile-pinned fixed-output fetch; the Compact compiler and circuit
-parameters come from the pinned `MediaNoxLabs/flake-collection` input. A bare
+a lockfile-pinned fixed-output fetch; the Compact compiler comes from the
+hash-pinned official release and circuit parameters from the pinned flake input. A bare
 `nix build` works too (`npm-artifacts` is the `default` package), and
 `nix flake check` audits the tarball contents (dist output, compact sources,
 helper scripts, no managed source maps, version consistency). Adding a new
 publishable package under `packages/` flows into this output automatically.
 
 > **Published-core note:** the family's core contract dependency
-> `@midnight-ntwrk/credential-compact@0.2.0` is published to npm and is
-> built against the same `@midnight-ntwrk/compact-runtime@0.16.0` the family
+> `@midnight-ntwrk/credential-compact@1.0.0-rc1` is published to npm and is
+> built against the same `@midnight-ntwrk/compact-runtime@0.21.0` the family
 > pins, so the dependency graph resolves a single shared runtime instance for
 > both packages. The manifest is strictly
 > registry-clean — dependencies resolve from the registry with no `.core-rc/`
-> and no `file:` override anywhere. The workspace carries exactly one
-> advisory-driven override (`nanoid@3.3.18`, GHSA-2v37-7h3g-55p8) in the
-> dev-tooling chain; it does not touch the publishable manifest or its
-> dependency policy. See the package
+> and no `file:` override anywhere. The existing advisory-driven workspace overrides are dev-tooling only
+> and do not propagate to consumers. See the package
 > [README](packages/midnight-vc-passport/README.md)
 > and [design](openspec/changes/extract-digital-passport-credential/design.md) for details.
 

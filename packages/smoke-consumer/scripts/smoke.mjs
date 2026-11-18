@@ -24,7 +24,7 @@
 // npm registry — this is a genuine registry-resolution proof, not a staged one.
 
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,7 +32,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '../../..'); // packages/smoke-consumer/scripts -> repo root
 const FAMILY = '@midnight-ntwrk/midnight-vc-passport';
-const NETWORK_ID = '@midnight-ntwrk/midnight-js-network-id';
+const { packageManager } = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
 
 function run(cmd, args, options = {}) {
   const result = spawnSync(cmd, args, {
@@ -139,7 +139,7 @@ try {
         version: '0.0.0',
         private: true,
         type: 'module',
-        packageManager: 'pnpm@10.34.1',
+        packageManager,
       },
       null,
       2,
@@ -147,9 +147,15 @@ try {
   );
 
   console.log('smoke: installing the family tarball with registry-only transitive resolution');
-  run('pnpm', ['add', tarballPath, NETWORK_ID], { cwd: isolated, env: consumerEnv });
+  run('pnpm', ['add', `./${tarball}`], { cwd: isolated, env: consumerEnv });
 
-  cpSync(join(here, 'round-trip.mjs'), join(isolated, 'round-trip.mjs'));
+  for (const file of ['round-trip.mjs', 'rc5-vector.json', 'public-types.mts', 'tsconfig.consumer.json']) {
+    cpSync(join(here, file), join(isolated, file));
+  }
+  console.log('smoke: checking public declarations (strict, skipLibCheck=false)');
+  run('node', [join(repoRoot, 'node_modules/typescript/bin/tsc'), '-p', 'tsconfig.consumer.json'], {
+    cwd: isolated, env: consumerEnv,
+  });
   console.log('smoke: running the issuance/presentation/verification round-trip');
   run('node', ['round-trip.mjs'], { cwd: isolated });
 

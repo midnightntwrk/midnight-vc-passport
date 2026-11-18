@@ -1,0 +1,142 @@
+{
+  "source": "@midnight-ntwrk/midnight-vc-passport@0.1.0-rc5",
+  "tarballIntegrity": "sha512-Aw/ikXjXeZsy0YopkrnIgK7dR2J5PhNApTmgecezUX8Zo7U6h9I8KEpVDFpjnLUQOgcaxaItopisnpv6N0iXww==",
+  "wire": {
+    "credential": {
+      "encoding": "compact-value-v1.base64url",
+      "payload": "TUNWMQAAABIAAAABAQAAABxtaWRuaWdodDp2YzpkaWdpdGFsLXBhc3Nwb3J0AAAAE2RpZ2l0YWwtcGFzc3BvcnQ6djEAAAABAQAAAAAAAAAgpMlIOgx83YCAVqkzNKuXIHs4tDY9HaXL-3itJWzWifAAAAANI2lzc3Vlci1rZXktMQAAACD3qfy3lbl4uoSoNgGj8MYhl-Y6CxAmDvKhM4arkgGbrAAAAA0jaG9sZGVyLWtleS0xAAAAAhAnAAAAAQEAAAACIE4AAAAgHiI64YIgigX47OPDxwWC0YP8COtsTh4Qq6rSUafGwqAAAAAgCfKXaredeIK0eW7BcqqLck58Qy0-_KcM3RdqUrFuStMAAAAgLfuoiC70uZgmRiXKOLTsy_pYh65XLY-ujsgMk59VHQcAAAAgbLBDeUIW8cbiSE1kRM2-cuouDS0tgDh_BE_t-tk3k5kAAAAgeUUG3M0PUIefWbg5og4R_mYrolm0nxf4UvsXCnG2wlgAAAAgoL5QxKvdQefq7_dPXI0oVrDs7dAXhpE_GfySNFqVX8M"
+    },
+    "issuanceProof": {
+      "encoding": "compact-value-v1.base64url",
+      "payload": "TUNWMQAAAAkAAAAgpMlIOgx83YCAVqkzNKuXIHs4tDY9HaXL-3itJWzWifAAAAANI2lzc3Vlci1rZXktMQAAAAIRJwAAACARnDu13_s-TOdUedef2-xNjIowS7BJGnysCu2Ux0n4VAAAAB-vdLcq4BXZjbC-JqDGpOwo25QWaoeVWN9bBC9lpX-lAAAAIG_BnsK7zMOYZXceHQR2UgKgYWG_6e21XXFagthVNPJjAAAAILQr7FnBB09v-rgAjh1AXVzHD492ugj8-DE8tUaPJzQlAAAAILKDVaDWM9CdxJj3Xco4Ue-beju87f0LqdDsDASj01hhAAAAIO-u8acaYsEFijMeu6qgAIPT1L0xlegbPFLshOrbWNwN"
+    },
+    "presentationProof": {
+      "encoding": "compact-value-v1.base64url",
+      "payload": "TUNWMQAAAAkAAAAg96n8t5W5eLqEqDYBo_DGIZfmOgsQJg7yoTOGq5IBm6wAAAANI2hvbGRlci1rZXktMQAAAAJ0JwAAACDLhn8freOnjhte8sh3BpAyRvvWOm5zt-yukgZ8rqQxrAAAACAEWnS-t2ovoJaNSfYW1CbFQZt_evG2OAZNk2HolyipCAAAACAaaIj-AV-DFeGJkv6VAyehcEOufWcFZMtMDh_5TDm8bwAAACACIZt7fpYs08l_2H62LtA8iddvZbjSFRN0H_BlvowqIQAAACAGZJHKGQ0jncSDFDKJ1Po6YtROtkl9mmJESQQAf9Q4KgAAACBdBT_xe1-pAFIndW35v-cup5htSFnmGCmg7ZErFEFgDg"
+    }
+  },
+  "credentialBodyRoot": {
+    "hex": "b42f1115042cefecbd5380a0a630c0ef5f18bb13e7615cb1de9d36256f100432"
+  },
+  "presentationBodyRoot": {
+    "hex": "047ec0d9873e3f4b110703e9a7d6b341f0bbed111e25929188a9ca0e34f9b035"
+  },
+  "presentation": {
+    "version": {
+      "bigint": "1"
+    },
+    "schema": {
+      "packageId": {
+        "hex": "6d69646e696768743a76633a6469676974616c2d70617373706f727400000000"
+      },
+      "schemaId": {
+        "hex": "6469676974616c2d70617373706f72743a763100000000000000000000000000"
+      },
+      "majorVersion": {
+        "bigint": "1"
+      },
+      "minorVersion": {
+        "bigint": "0"
+      }
+    },
+    "credentialClaimRoot": {
+      "hex": "a0be50c4abdd41e7eaeff74f5c8d2856b0ecedd01786913f19fc92345a955fc3"
+    },
+    "issuerVerificationMethodRef": {
+      "controllerAddress": {
+        "bytes": {
+          "hex": "a4c9483a0c7cdd808056a93334ab97207b38b4363d1da5cbfb78ad256cd689f0"
+        }
+      },
+      "methodId": {
+        "hex": "236973737565722d6b65792d3100000000000000000000000000000000000000"
+      }
+    },
+    "holderBinding": {
+      "holderVerificationMethodRef": {
+        "controllerAddress": {
+          "bytes": {
+            "hex": "f7a9fcb795b978ba84a83601a3f0c62197e63a0b10260ef2a13386ab92019bac"
+          }
+        },
+        "methodId": {
+          "hex": "23686f6c6465722d6b65792d3100000000000000000000000000000000000000"
+        }
+      }
+    },
+    "disclosed": {
+      "revealFirstName": false,
+      "firstNameValuePadded": {
+        "hex": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "firstNameOpening": {
+        "hex": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "revealLastName": true,
+      "lastNameValuePadded": {
+        "hex": "4578616d706c65000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "lastNameOpening": {
+        "hex": "cfd8fa0c933a5e1e8c0fc0990009d943c35bcb23d60a45064f9dceec02675c1e"
+      },
+      "proveAgeOverThreshold": true,
+      "ageThresholdYears": {
+        "bigint": "18"
+      },
+      "revealDocumentNumber": false,
+      "documentNumberValue": {
+        "hex": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "documentNumberOpening": {
+        "hex": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "revealIssuingState": false,
+      "issuingStateValue": {
+        "hex": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "issuingStateOpening": {
+        "hex": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  },
+  "presentationRequest": {
+    "version": {
+      "bigint": "1"
+    },
+    "schema": {
+      "packageId": {
+        "hex": "6d69646e696768743a76633a6469676974616c2d70617373706f727400000000"
+      },
+      "schemaId": {
+        "hex": "6469676974616c2d70617373706f72743a763100000000000000000000000000"
+      },
+      "majorVersion": {
+        "bigint": "1"
+      },
+      "minorVersion": {
+        "bigint": "0"
+      }
+    },
+    "issuerVerificationMethodRef": {
+      "controllerAddress": {
+        "bytes": {
+          "hex": "a4c9483a0c7cdd808056a93334ab97207b38b4363d1da5cbfb78ad256cd689f0"
+        }
+      },
+      "methodId": {
+        "hex": "236973737565722d6b65792d3100000000000000000000000000000000000000"
+      }
+    },
+    "requireFirstNameDisclosure": false,
+    "requireLastNameDisclosure": true,
+    "requireAgeOverThreshold": true,
+    "requestedAgeThresholdYears": {
+      "bigint": "18"
+    },
+    "requireDocumentNumberDisclosure": false,
+    "requireIssuingStateDisclosure": false,
+    "verifierChallengeHash": {
+      "hex": "cb867f1fade3a78e1b5ef2c87706903246fbd63a6e73b7ecae92067caea431ac"
+    }
+  }
+}

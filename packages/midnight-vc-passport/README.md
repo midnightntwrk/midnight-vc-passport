@@ -20,7 +20,7 @@ Tier:
 
 Dependency direction:
 
-- depends on reusable core packages (`@midnight-ntwrk/compact-runtime@0.16.0` and
+- depends on reusable core packages (`@midnight-ntwrk/compact-runtime@0.21.0` and
   the published `@midnight-ntwrk/credential-compact` contract layer)
 - may be composed by Layer 3 contracts and Layer 4 adapters
 - does not depend on protocol/orchestration packages, demos, or standalone
@@ -207,20 +207,57 @@ change here must be validated against the core codec.
 
 This repository ships a private `packages/smoke-consumer` workspace and CI lane
 that packs the built tarball, installs it into a clean registry-resolved
-environment, imports every public entry point (`.`, `./codecs`, `./contract`,
-`./testing`), and runs an issuance/presentation fixture round-trip. Because
-`@midnight-ntwrk/credential-compact@0.2.0` and `@midnight-ntwrk/compact-runtime@0.16.0`
-are published, the isolated project resolves every dependency from the npm
-registry — a genuine registry-resolution proof. That lane is the boundary proof
-that authorizes deletion of the monorepo prototype, and it runs green on every
-push/PR.
+environment, type-checks and imports the root, `./codecs`, `./contract`,
+`./testing` and `./managed/digital-passport-credential/contract/index.js`, and
+runs fresh and fixed rc5 vectors. The isolated consumer resolves the package's
+two dependencies from npm and checks that Passport and core share a runtime
+instance. This test does not authorize removal of the monorepo prototype.
+
+## Ledger 9 migration
+
+The Ledger 9 build pins `credential-compact@1.0.0-rc1` and
+`compact-runtime@0.21.0` together. The published `0.1.0-rc5` is the
+pre-upgrade line. A consumer applying a seven-day release-age policy without
+the producer's existing core exemption must wait for that exact core version
+to satisfy its own floor. No exemptions or overrides are required of consumers;
+the producer's lockfile and reviewed exclusions do not propagate.
+
+**Generated API (breaking vs rc5).** All five package entry points remain.
+Contextual `Contract.initialState(...)` and `Contract.circuits.*(...)` now
+return Promises: await them. `pureCircuits.*` remains synchronous.
+`contractReferenceLocations` and its `ContractReferenceLocations` type
+are no longer generated or re-exported. Do not treat the new
+`expectedVk`, `circuitSignatures`, and `declaredInterfaces` exports as
+substitutes for source locations. The managed subpath and the package's
+re-exports expose the same generated module. Release version selection
+must account for these breaking changes; prefer a new pre-1.0 minor RC
+line rather than presenting this as an API-compatible rc5 refresh.
+
+**Persisted off-chain data.** Fixed synthetic credentials, issuer and holder
+proofs, and a presentation/request from the published rc5 archive verify
+with the new pure circuits. The sampled credential and proof
+`compact-value-v1.base64url` (`MCV1`) bytes decode and re-encode identically;
+changed signatures, a mismatched challenge and invalid wire framing reject.
+The family/schema identifiers and explicit holder/no-status profile are
+unchanged. This evidence does not establish compatibility for every stored
+credential or any old on-chain proof, key, deployment, or DID. No blanket
+reissuance follows from the sampled signature tests. If issuer or holder
+verification references change, revalidate the bindings; a credential
+whose signed references must change needs reissuance and affected
+presentations need new holder proofs.
+
+**On-chain composition.** Recompile consuming contracts with Compact 0.36.0,
+regenerate ZKIR and proving/verification keys and plan fresh Ledger 9
+deployments before relying on them. Do not reuse Ledger 8 build artifacts.
+Pure simulated verification is not a chain proof or deployment test; no
+live DID interoperability is claimed.
 
 ## Build and test
 
 This repository is a pnpm + turbo workspace with a Nix flake that pins the
-Compact compiler (**0.31.1**) and the Midnight circuit parameters, both
-sourced from the `MediaNoxLabs/flake-collection` flake input and
-pre-populated for offline compilation.
+Compact compiler (**0.36.0**, official hash-pinned release archive) and supplies
+Midnight circuit parameters from the pinned `MediaNoxLabs/flake-collection`
+input for offline compilation.
 
 ```sh
 # one-time: enter the reproducible dev shell (provides node, pnpm, compact toolchain)

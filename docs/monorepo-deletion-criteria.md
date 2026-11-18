@@ -11,6 +11,10 @@ during the transition; deletion is performed by a **separate change in the
 This repository is the sole source of truth for the family. The criteria below
 are the handoff contract for the monorepo-side deletion change.
 
+The version pins and receipts below describe the pre-Ledger-9 extraction.
+They are historical evidence, not a certification of the Ledger 9 build
+or approval to delete the monorepo prototype.
+
 ## All of the following must hold before the monorepo duplicate is deleted
 
 1. **Core contract layer published.** `@midnight-ntwrk/credential-compact` is

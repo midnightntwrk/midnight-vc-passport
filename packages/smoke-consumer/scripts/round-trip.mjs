@@ -25,17 +25,36 @@
 // only the package's public surface, never its internals.
 
 import assert from 'node:assert/strict';
-
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
+import { readFileSync, realpathSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { sep } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import * as root from '@midnight-ntwrk/midnight-vc-passport';
 import * as codecs from '@midnight-ntwrk/midnight-vc-passport/codecs';
 import * as contract from '@midnight-ntwrk/midnight-vc-passport/contract';
 import * as testing from '@midnight-ntwrk/midnight-vc-passport/testing';
+import * as managed from '@midnight-ntwrk/midnight-vc-passport/managed/digital-passport-credential/contract/index.js';
 
-// The pure circuits derive on-chain identifiers from the active network id; the
-// undeployed id matches the local/off-chain simulation used by the ported suite.
-setNetworkId('undeployed');
+const FAMILY = '@midnight-ntwrk/midnight-vc-passport';
+const CORE = '@midnight-ntwrk/credential-compact';
+const RUNTIME = '@midnight-ntwrk/compact-runtime';
+const resolveHere = createRequire(import.meta.url);
+const familyEntry = realpathSync(resolveHere.resolve(FAMILY));
+const resolveFamily = createRequire(familyEntry);
+const coreEntry = realpathSync(resolveFamily.resolve(CORE));
+const resolveCore = createRequire(coreEntry);
+const familyRuntime = realpathSync(resolveFamily.resolve(RUNTIME));
+const coreRuntime = realpathSync(resolveCore.resolve(RUNTIME));
+const installed = realpathSync('node_modules') + sep;
+for (const path of [familyEntry, coreEntry, familyRuntime, coreRuntime]) {
+  assert.ok(path.startsWith(installed), `not installed in consumer: ${path}`);
+}
+assert.equal(familyRuntime, coreRuntime);
+const runtime = await import(pathToFileURL(familyRuntime).href);
+assert.equal(runtime, await import(pathToFileURL(coreRuntime).href));
+const runtimeManifest = resolveFamily(`${RUNTIME}/package.json`);
+console.log(JSON.stringify({ familyEntry, coreEntry, familyRuntime, coreRuntime, runtime: runtimeManifest.version }));
 
 function check(name, condition = true) {
   if (!condition) {
@@ -59,7 +78,15 @@ check(
     typeof codecs.encodeDigitalPassportProof === 'function' &&
     typeof codecs.decodeDigitalPassportProof === 'function',
 );
-check('./contract exports the pure circuits', typeof contract.pureCircuits === 'object');
+assert.strictEqual(contract.pureCircuits, managed.pureCircuits);
+assert.strictEqual(root.Contract, managed.Contract);
+assert.strictEqual(root.encodeDigitalPassportCredential, codecs.encodeDigitalPassportCredential);
+assert.ok(!('createDigitalPassportProtocolFixture' in root));
+assert.ok(!('contractReferenceLocations' in managed));
+assert.ok('issuanceContextTag' in managed.circuitSignatures);
+assert.deepEqual(managed.expectedVk, {});
+assert.deepEqual(managed.declaredInterfaces, {});
+check('./contract and explicit managed subpath expose the same generated module');
 check(
   './testing exports the protocol fixture builder',
   typeof testing.createDigitalPassportProtocolFixture === 'function',
@@ -68,6 +95,33 @@ check(
 // 2. Issuance / presentation / verification flow through the pure circuits.
 const fixture = testing.createDigitalPassportProtocolFixture();
 const { pureCircuits } = root;
+
+// Exercise a real runtime context locally, not a deployed contract.
+const localAddress = '00'.repeat(32);
+const generated = new managed.Contract({});
+const initial = await generated.initialState(runtime.createConstructorContext(undefined, localAddress));
+assert.deepEqual(managed.ledger(initial.currentContractState.data), {});
+const context = runtime.createCircuitContext({
+  circuitId: 'issuanceContextTag',
+  contractAddress: localAddress,
+  coinPublicKeyOrZswapState: localAddress,
+  contractState: initial.currentContractState,
+  privateState: undefined,
+  time: 0,
+});
+const pending = generated.circuits.issuanceContextTag(context);
+assert.ok(pending instanceof Promise);
+assert.deepEqual((await pending).result, pureCircuits.issuanceContextTag());
+check('managed constructor, ledger and Promise-returning contextual circuit');
+
+pureCircuits.assertValidDigitalPassportCredential(fixture.credential, fixture.credentialProof);
+pureCircuits.assertValidDigitalPassportPresentation(
+  fixture.credential, fixture.credentialProof, fixture.presentation, fixture.presentationProof,
+);
+pureCircuits.assertDigitalPassportPresentationSatisfiesRequest(
+  fixture.credential, fixture.presentationRequest, fixture.presentation, fixture.presentationProof,
+);
+check('fresh synthetic credential and holder proof verify against the presentation request');
 
 const presentationRequest = pureCircuits.digitalPassportPresentationRequestFromProtocol(
   fixture.verificationRequest,
@@ -99,28 +153,54 @@ check('verification request -> submission -> result all align');
 const encodedCredential = codecs.encodeDigitalPassportCredential(fixture.credential);
 assert.equal(encodedCredential.encoding, 'compact-value-v1.base64url');
 const decodedCredential = codecs.decodeDigitalPassportCredential(encodedCredential);
-assert.deepEqual(
-  new Uint8Array(decodedCredential.claimRoot),
-  new Uint8Array(fixture.credential.claimRoot),
-);
-assert.deepEqual(
-  new Uint8Array(decodedCredential.schema.packageId),
-  new Uint8Array(fixture.credential.schema.packageId),
-);
-assert.deepEqual(
-  new Uint8Array(decodedCredential.schema.schemaId),
-  new Uint8Array(fixture.credential.schema.schemaId),
-);
+assert.deepEqual(decodedCredential, fixture.credential);
 check('credential encodes to compact-value-v1.base64url and decodes back faithfully');
 
 const encodedProof = codecs.encodeDigitalPassportProof(fixture.credentialProof);
 const decodedProof = codecs.decodeDigitalPassportProof(encodedProof);
-assert.deepEqual(
-  new Uint8Array(decodedProof.challengeHash),
-  new Uint8Array(fixture.credentialProof.challengeHash),
-);
+assert.deepEqual(decodedProof, fixture.credentialProof);
 check('proof encodes and decodes back faithfully');
 
-console.log(
-  '\nSMOKE OK: every public entry point imported; issuance/presentation/verification and codec round-trips succeeded.',
+// Do not regenerate these expectations from the candidate. The literal bytes,
+// roots and presentation/request values were captured from the published rc5.
+const rc5 = JSON.parse(readFileSync(new URL('./rc5-vector.json', import.meta.url), 'utf8'),
+  (_key, value) => {
+    if (value && typeof value === 'object') {
+      if ('bigint' in value) return BigInt(value.bigint);
+      if ('hex' in value) return Uint8Array.from(Buffer.from(value.hex, 'hex'));
+    }
+    return value;
+  },
 );
+const oldCredential = codecs.decodeDigitalPassportCredential(rc5.wire.credential);
+const oldIssuanceProof = codecs.decodeDigitalPassportProof(rc5.wire.issuanceProof);
+const oldHolderProof = codecs.decodeDigitalPassportProof(rc5.wire.presentationProof);
+assert.deepEqual(codecs.encodeDigitalPassportCredential(oldCredential), rc5.wire.credential);
+assert.deepEqual(codecs.encodeDigitalPassportProof(oldIssuanceProof), rc5.wire.issuanceProof);
+assert.deepEqual(codecs.encodeDigitalPassportProof(oldHolderProof), rc5.wire.presentationProof);
+assert.deepEqual(pureCircuits.digitalPassportCredentialBodyRoot(oldCredential), rc5.credentialBodyRoot);
+assert.deepEqual(pureCircuits.digitalPassportPresentationBodyRoot(rc5.presentation), rc5.presentationBodyRoot);
+pureCircuits.assertValidDigitalPassportCredential(oldCredential, oldIssuanceProof);
+pureCircuits.assertValidDigitalPassportPresentation(
+  oldCredential, oldIssuanceProof, rc5.presentation, oldHolderProof,
+);
+pureCircuits.assertDigitalPassportPresentationSatisfiesRequest(
+  oldCredential, rc5.presentationRequest, rc5.presentation, oldHolderProof,
+);
+const corrupt = (proof) => ({ ...proof, signature: { ...proof.signature, s: proof.signature.s + 1n } });
+assert.throws(() => pureCircuits.assertValidDigitalPassportCredential(oldCredential, corrupt(oldIssuanceProof)), /signature/i);
+assert.throws(() => pureCircuits.assertValidDigitalPassportPresentation(
+  oldCredential, oldIssuanceProof, rc5.presentation, corrupt(oldHolderProof),
+), /signature/i);
+const wrongRequest = { ...rc5.presentationRequest, verifierChallengeHash: new Uint8Array(32).fill(9) };
+assert.throws(() => pureCircuits.assertDigitalPassportPresentationSatisfiesRequest(
+  oldCredential, wrongRequest, rc5.presentation, oldHolderProof,
+), /challenge/i);
+const badFrame = Buffer.from(rc5.wire.issuanceProof.payload, 'base64url');
+badFrame[0] ^= 1;
+assert.throws(() => codecs.decodeDigitalPassportProof({
+  ...rc5.wire.issuanceProof, payload: badFrame.toString('base64url'),
+}), /magic header/);
+check('fixed rc5 wire bytes and credential/presentation proofs carry forward; corrupt proofs, challenge and framing reject');
+
+console.log('\nSMOKE OK: fresh and fixed rc5 off-chain checks passed (not chain proof evidence).');
