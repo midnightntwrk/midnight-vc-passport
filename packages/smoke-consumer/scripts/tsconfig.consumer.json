@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "strict": true,
+    "skipLibCheck": false,
+    "noEmit": true,
+    "types": []
+  },
+  "files": [
+    "public-types.mts"
+  ]
+}

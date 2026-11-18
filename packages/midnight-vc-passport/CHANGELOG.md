@@ -12,6 +12,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Adopt the Ledger 9 cohort: `credential-compact@1.0.0-rc1`,
+  `compact-runtime@0.21.0`, Compact 0.36.0 and its native runtime guard.
+- **Breaking generated API:** contextual circuits and `Contract.initialState`
+  return Promises. `contractReferenceLocations` and its type are removed;
+  the compiler exports `expectedVk`, `circuitSignatures` and
+  `declaredInterfaces`. All package entry points and synchronous pure
+  circuits remain. See the README for application migration and bounds of
+  the rc5 credential/proof compatibility evidence.
+
 ## [0.1.0-rc5] - 2026-09-30
 
 Fifth release candidate of the `0.1.0` line, the first published through the

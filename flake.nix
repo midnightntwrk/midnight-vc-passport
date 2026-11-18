@@ -8,7 +8,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
-    # Provides compact-toolchain, compact-midnight and midnight-circuit-params.
+    # Provides the compact devtool and midnight-circuit-params.
     flake-collection.url = "github:MediaNoxLabs/flake-collection";
     flake-collection.inputs.nixpkgs.follows = "nixpkgs";
   };

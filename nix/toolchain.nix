@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# Pinned Compact toolchain from flake-collection, shared with the other
-# modules through the perSystem `toolchain` option.
+# Pinned official compiler plus the devtool and circuit parameters from
+# flake-collection, shared through the perSystem `toolchain` option.
 { lib, ... }:
 {
   perSystem =
@@ -12,8 +12,8 @@
       ...
     }:
     let
-      # Must agree with COMPACT_COMPILER_VERSION in .github/workflows/ci.yml.
-      compactCompilerVersion = "0.31.1";
+      # Must agree with COMPACT_COMPILER_VERSION in CI and publication.
+      compactCompilerVersion = "0.36.0";
     in
     {
       options.toolchain = lib.mkOption {
@@ -26,7 +26,7 @@
         toolchain = {
           compilerVersion = compactCompilerVersion;
           compact-midnight = inputs'.flake-collection.packages.compact-midnight;
-          compact-toolchain = inputs'.flake-collection.packages.compact-toolchain;
+          compact-toolchain = pkgs.callPackage ./compact-toolchain.nix { version = compactCompilerVersion; };
           midnight-circuit-params = inputs'.flake-collection.packages.midnight-circuit-params;
         };
 
@@ -39,7 +39,7 @@
             }
             ''
               if [ "$actual" != "$expected" ]; then
-                echo "ERROR: flake-collection compact-toolchain version ($actual) != pin ($expected)" >&2
+                echo "ERROR: compact-toolchain version ($actual) != pin ($expected)" >&2
                 echo "Align the pin in nix/toolchain.nix and COMPACT_COMPILER_VERSION in .github/workflows/ci.yml." >&2
                 exit 1
               fi

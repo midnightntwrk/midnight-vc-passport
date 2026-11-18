@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Align CI, publication and Nix on Compact 0.36.0 for Ledger 9, with a
+  refreshed offline store and strict packed-consumer checks including fixed
+  rc5 credentials, proofs and wire bytes. See the package changelog for
+  generated API breaks.
+- Refresh the lint resolver and its existing semver transitives under the
+  unchanged age and trust policy.
+
 - **BREAKING (release process):** npmjs publication is mandatory and the
   GitHub-Release distribution window has ended. A green publish run now
   means the version is **Verified** (see `CONTEXT.md`): `continue-on-error`

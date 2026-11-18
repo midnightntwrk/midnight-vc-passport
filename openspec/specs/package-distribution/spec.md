@@ -15,11 +15,11 @@ The package SHALL be named `@midnight-ntwrk/midnight-vc-passport` and SHALL live
 
 ### Requirement: Public export surface
 
-The package SHALL expose exactly these entry points: the root entry (family contract types, codecs, and contract module — excluding fixtures), `./codecs`, `./contract`, and `./testing`. Every documented entry point SHALL resolve through the manifest exports map. Fixtures SHALL NOT be re-exported from the root entry.
+The package SHALL expose exactly these entry points: the root entry (family contract types, codecs, and contract module — excluding fixtures), `./codecs`, `./contract`, `./testing`, and `./managed/digital-passport-credential/contract/index.js`. Every documented entry point SHALL resolve through the manifest exports map. Fixtures SHALL NOT be re-exported from the root entry.
 
 #### Scenario: Every advertised subpath resolves
 
-- **WHEN** a consumer imports the root entry, `./codecs`, `./contract`, or `./testing` of the packed package
+- **WHEN** a consumer imports any of the five public entry points of the packed package
 - **THEN** each import resolves and loads
 
 #### Scenario: Root stays fixture-free
@@ -29,33 +29,33 @@ The package SHALL expose exactly these entry points: the root entry (family cont
 
 ### Requirement: Registry-resolvable dependencies
 
-The **publishable manifest** SHALL depend only on packages resolvable from the npm registry at pinned semantic versions — the published contract layer `@midnight-ntwrk/credential-compact` (pinned to `0.2.0`, the stable release built against the same Compact 0.31.1 toolchain and `compact-runtime@0.16.0` the family pins) and `@midnight-ntwrk/compact-runtime` pinned to `0.16.0`. The publishable manifest SHALL contain no `workspace:`, `file:`, git, URL, or sibling-path dependencies, and no dependency on the monorepo's openid package.
+The **publishable manifest** SHALL depend only on packages resolvable from the npm registry at pinned semantic versions — the published contract layer `@midnight-ntwrk/credential-compact` (pinned to the Ledger 9 `1.0.0-rc1`, built with Compact 0.36.0 and the same runtime as Passport) and `@midnight-ntwrk/compact-runtime` pinned to `0.21.0`. The publishable manifest SHALL contain no `workspace:`, `file:`, git, URL, or sibling-path dependencies, and no dependency on the monorepo's openid package.
 
 The runtime-version guard contract SHALL hold for both code paths that load generated contract code:
 
-- The family's own managed artifacts SHALL carry the compiler-emitted guard for 0.16.0 (see `repository-toolchain`: Native runtime-version guard).
-- The published `credential-compact` prebuilt JavaScript SHALL carry its own published guard for `0.16.0`. Because core and family now pin the same runtime, the dependency graph SHALL resolve a single `compact-runtime@0.16.0` instance shared by both packages — no private duplicate runtime instance is staged for the core, and no values cross a runtime-instance boundary.
+- The family's own managed artifacts SHALL carry the compiler-emitted guard for 0.21.0 (see `repository-toolchain`: Native runtime-version guard).
+- The published `credential-compact` prebuilt JavaScript SHALL carry its own published guard for `0.21.0`. Core and family SHALL load the same `compact-runtime@0.21.0` instance, without a workspace link or producer override.
 
 The family SHALL consume the core's managed contract API through the package specifier the core exports it at (the root export `@midnight-ntwrk/credential-compact`); the core's former `./contract`, `./jubjub`, and `./holder-binding/*` subpath exports no longer exist and SHALL NOT be imported.
 
 #### Scenario: Publishable manifest is registry-clean
 
 - **WHEN** the publishable (family) package manifest is inspected
-- **THEN** it declares only registry-resolvable semver dependencies (`credential-compact@0.2.0`, `compact-runtime@0.16.0`), with no `workspace:`/`file:`/git/URL/sibling-path entries
+- **THEN** it declares only registry-resolvable semver dependencies (`credential-compact@1.0.0-rc1`, `compact-runtime@0.21.0`), with no `workspace:`/`file:`/git/URL/sibling-path entries
 
 #### Scenario: Registry resolution confirmed
 
 - **WHEN** the consumer smoke runs in an isolated project with no local-path override
-- **THEN** the packed family tarball installs and every dependency (family + core + runtime) resolves from the npm registry
+- **THEN** the exact family tarball installs and its core and runtime dependencies resolve from the npm registry, subject to the consumer's active policies
 
 #### Scenario: Single shared runtime instance
 
 - **WHEN** the resolved dependency graph of the family package is inspected
-- **THEN** exactly one `compact-runtime` version (0.16.0) is resolved for both the family's managed artifacts and the core's prebuilt JavaScript, and importing both in one process loads them against that shared instance without a version-mismatch error
+- **THEN** exactly one `compact-runtime` version (0.21.0) is resolved for both the family's managed artifacts and the core's prebuilt JavaScript, and importing both in one process loads them against that shared instance without a version-mismatch error
 
 #### Scenario: Prebuilt core JavaScript imports cleanly
 
-- **WHEN** the `credential-compact` prebuilt JavaScript entry points are imported in a workspace that also depends on compact-runtime 0.16.0
+- **WHEN** the `credential-compact` prebuilt JavaScript entry points are imported in a workspace that also depends on compact-runtime 0.21.0
 - **THEN** the imports load without a runtime version-mismatch error, against the single shared runtime instance
 
 #### Scenario: Core consumed through its published export surface
@@ -65,7 +65,7 @@ The family SHALL consume the core's managed contract API through the package spe
 
 #### Scenario: Family artifacts guard the pinned runtime
 
-- **WHEN** the family's generated managed artifacts are loaded against compact-runtime 0.16.0
+- **WHEN** the family's generated managed artifacts are loaded against compact-runtime 0.21.0
 - **THEN** the compiler-emitted guard passes without post-build rewriting
 
 ### Requirement: Inlined compact-value codec
@@ -98,12 +98,12 @@ The package SHALL carry everything needed to consume or rebuild it: compiled dis
 
 ### Requirement: Consumer consumability evidence
 
-The repository SHALL include a private consumer workspace and a smoke run that: pack the built package, install the tarball into a clean environment, import every public entry point, and execute a credential fixture round-trip. The publishable manifest resolves its dependencies strictly from the npm registry — `@midnight-ntwrk/credential-compact` and `@midnight-ntwrk/compact-runtime` are both published, so the smoke is a genuine registry-resolution proof (no tarball staging, no overrides). This evidence establishes that the family is consumable as a normal npm package; authorizing deletion of the monorepo duplicate is a separate change in `midnight-verifiable-credentials`.
+The repository SHALL include a private consumer workspace and a smoke run that packs the built package, installs the exact tarball into a clean environment, type-checks and imports all public entry points, and exercises fresh issuance, presentation, verification and codec round-trips. The smoke SHALL separately check fixed pre-upgrade credential, proof and wire vectors with rejection cases; simulated signing/verification SHALL NOT be reported as chain proof or deployment evidence. The publishable manifest resolves its dependencies strictly from the npm registry — `@midnight-ntwrk/credential-compact` and `@midnight-ntwrk/compact-runtime` are both published, so the smoke is a genuine registry-resolution proof (no tarball staging, no overrides). This evidence establishes that the family is consumable as a normal npm package; authorizing deletion of the monorepo duplicate is a separate change in `midnight-verifiable-credentials`.
 
 #### Scenario: Smoke round-trip
 
-- **WHEN** the smoke runs against the built tarball in an isolated project with every dependency resolved from the npm registry
-- **THEN** installation succeeds, every public entry point imports, and an issuance/presentation fixture round-trip validates
+- **WHEN** the smoke runs against the built tarball in an isolated project with registry dependencies and no workspace overrides
+- **THEN** the installed declarations and all public entry points work, a fresh issue/present/verify flow and codec round-trip validate, and fixed rc5 positives and negatives give their recorded outcomes
 
 ### Requirement: Provenance headers
 

@@ -26,17 +26,17 @@ The repository SHALL require Node.js >= 24 and pnpm >= 10, declared in the root 
 
 ### Requirement: Pinned Compact toolchain
 
-The Compact compiler version SHALL be pinned identically for CI and for the nix development shell. The CI lane SHALL install the compiler through the organization's setup-compact action pinned by commit SHA. The nix flake SHALL provide the compact toolchain and circuit parameters required for offline compilation, both sourced from the `MediaNoxLabs/flake-collection` flake input: the toolchain as `compact-toolchain` and the circuit parameters as `midnight-circuit-params`. The flake SHALL NOT depend on the `midnight-did` repository for any build input, and circuit parameters SHALL NOT be vendored as a derivation in this repository. A build-time check SHALL fail if the provided toolchain version ever drifts from the pin.
+CI, npm publication, and Nix development and offline packaging SHALL use Compact 0.36.0. CI and publication SHALL install it through the organization's setup-compact action pinned by commit SHA. Nix SHALL use a hash-pinned official compiler archive and supply the devtool and `midnight-circuit-params` from the pinned `MediaNoxLabs/flake-collection` input. The flake SHALL NOT depend on the `midnight-did` repository or vendor circuit parameters. Nix build checks SHALL reject drift from the pin and verify the archive reports the expected compiler and backend versions.
 
 #### Scenario: Compiler versions agree
 
-- **WHEN** the CI workflow environment and the flake-provided toolchain are compared
-- **THEN** both provide the same pinned Compact compiler version
+- **WHEN** CI, publication and flake-provided toolchains are compared
+- **THEN** they provide the same pinned Compact compiler version
 
 #### Scenario: Toolchain is upstream-independent
 
 - **WHEN** the nix flake inputs are inspected
-- **THEN** the compact toolchain and the circuit parameters both resolve through `MediaNoxLabs/flake-collection`, with no `midnight-did` input and no locally vendored circuit-parameter derivation
+- **THEN** the compiler resolves from its hash-pinned official release and the devtool and circuit parameters resolve through `MediaNoxLabs/flake-collection`, with no `midnight-did` input and no locally vendored circuit-parameter derivation
 
 #### Scenario: Offline contract compilation
 
@@ -50,7 +50,7 @@ The Compact compiler version SHALL be pinned identically for CI and for the nix 
 
 ### Requirement: Native runtime-version guard
 
-The compact compiler SHALL be pinned to a version whose emitted `checkRuntimeVersion` guard matches the runtime version this repository depends on (`@midnight-ntwrk/compact-runtime@0.16.0`). The build SHALL NOT rewrite the compiler-emitted guard in generated managed code: the guard present in the built artifacts SHALL be the one the compiler emitted natively.
+The compact compiler SHALL be pinned to a version whose emitted `checkRuntimeVersion` guard matches the runtime version this repository depends on (`@midnight-ntwrk/compact-runtime@0.21.0`). The build SHALL NOT rewrite the compiler-emitted guard in generated managed code: the guard present in the built artifacts SHALL be the one the compiler emitted natively.
 
 #### Scenario: Guard matches the installed runtime
 
