@@ -56,7 +56,7 @@ runs:
 
     - name: Set up Compact toolchain
       if: inputs.compact-version != ''
-      uses: midnightntwrk/setup-compact-action@43f89f99939f716f68c1c56b2a12bba044407bfd # ratchet:midnightntwrk/setup-compact-action@v1
+      uses: midnightntwrk/setup-compact-action@836895c8fffbbea6bd986af2b17e8941ff29d1f8 # v1
       with:
         compact-version: ${{ inputs.compact-version }}
         github-token: ${{ inputs.github-token }}
